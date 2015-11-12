@@ -311,8 +311,8 @@ static void initMeshes() {
 static void updateColorCrosshair() {
     identity_m4(colorCrosshair->modelMatrix);
     translate_m4(colorCrosshair->modelMatrix,
-                    - (0.5f - colorx) * PIXEL_X(ccparams[0] * ccparams[2]),
-                    -1.0f + (1.0f - colory) * PIXEL_Y(ccparams[1] * ccparams[2]) + PIXEL_Y(ccparams[3]), 0);
+                 - (0.5f - colorx) * PIXEL_X(ccparams[0] * ccparams[2]),
+                 -1.0f + (1.0f - colory) * PIXEL_Y(ccparams[1] * ccparams[2]) + PIXEL_Y(ccparams[3]), 0);
 }
 
 static void updateColorRect() {

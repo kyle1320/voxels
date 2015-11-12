@@ -69,15 +69,15 @@ void renderChunk(Chunk *chunk) {
     else
         size = renderChunkToArrays(chunk, points, normals, colors, (vec3){0, 0, 0}, 1.0);
 
-    buildMesh(    chunk->mesh, points, normals, colors, NULL, NULL,
-                size * sizeof(GLfloat), size * sizeof(GLfloat),
-                size * sizeof(GLfloat), 0, 0,
-                size / 3);
+    buildMesh(chunk->mesh, points, normals, colors, NULL, NULL,
+              size * sizeof(GLfloat), size * sizeof(GLfloat),
+              size * sizeof(GLfloat), 0, 0,
+              size / 3);
 
-    translate_m4(    chunk->mesh->modelMatrix,
-                    chunk->x * CHUNK_WIDTH,
-                    chunk->y * CHUNK_WIDTH,
-                    chunk->z * CHUNK_WIDTH);
+    translate_m4(chunk->mesh->modelMatrix,
+                 chunk->x * CHUNK_WIDTH,
+                 chunk->y * CHUNK_WIDTH,
+                 chunk->z * CHUNK_WIDTH);
 
     free(points);
     free(normals);
@@ -166,44 +166,44 @@ int renderChunkToArrays(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfloat
 
                 // check if each face is visible
                 if (x == CHUNK_SIZE - 1 || !getBlock(chunk, x+1, y, z)->active || getBlock(chunk, x+1, y, z)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[ 0]);
-                    getFaceData(&normals[points_index], &cubeNormals[5],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[ 0]);
+                    getFaceData(&normals[points_index],    &cubeNormals[5],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
 
                 if (y == CHUNK_SIZE - 1 || !getBlock(chunk, x, y+1, z)->active || getBlock(chunk, x, y+1, z)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[ 6]);
-                    getFaceData(&normals[points_index], &cubeNormals[4],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[ 6]);
+                    getFaceData(&normals[points_index],    &cubeNormals[4],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
 
                 if (z == CHUNK_SIZE - 1 || !getBlock(chunk, x, y, z+1)->active || getBlock(chunk, x, y, z+1)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[12]);
-                    getFaceData(&normals[points_index], &cubeNormals[3],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[12]);
+                    getFaceData(&normals[points_index],    &cubeNormals[3],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
 
                 if (x == 0 || !getBlock(chunk, x-1, y, z)->active || getBlock(chunk, x-1, y, z)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[18]);
-                    getFaceData(&normals[points_index], &cubeNormals[2],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[18]);
+                    getFaceData(&normals[points_index],    &cubeNormals[2],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
 
                 if (y == 0 || !getBlock(chunk, x, y-1, z)->active || getBlock(chunk, x, y-1, z)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[24]);
-                    getFaceData(&normals[points_index], &cubeNormals[1],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[24]);
+                    getFaceData(&normals[points_index],    &cubeNormals[1],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
 
                 if (z == 0 || !getBlock(chunk, x, y, z-1)->active || getBlock(chunk, x, y, z-1)->data) {
-                    getFaceData(&points[points_index],     cube_vertices,         &cubeIndices[30]);
-                    getFaceData(&normals[points_index], &cubeNormals[0],     zeroIndices);
-                    getFaceData(&colors[points_index],     color,                 zeroIndices);
+                    getFaceData(&points[points_index],     cube_vertices,      &cubeIndices[30]);
+                    getFaceData(&normals[points_index],    &cubeNormals[0],    zeroIndices);
+                    getFaceData(&colors[points_index],     color,              zeroIndices);
                     points_index += 6 * 3;
                 }
             }
@@ -578,10 +578,10 @@ void buildBlockFrame(Mesh *mesh) {
     #undef OUTER_FACE
     #undef INNER_FACE
 
-    buildMesh(    mesh, points, normals, colors, NULL, indices,
-                sizeof(points), sizeof(normals),
-                sizeof(colors), 0, sizeof(indices),
-                (sizeof(indices) / sizeof(GLuint)));
+    buildMesh(mesh, points, normals, colors, NULL, indices,
+              sizeof(points), sizeof(normals),
+              sizeof(colors), 0, sizeof(indices),
+              (sizeof(indices) / sizeof(GLuint)));
 }
 
 int isVisible(Chunk *chunk, mat4 view, mat4 perspective) {
@@ -728,7 +728,7 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
 
             // now check if the block is solid
             if (getBlock(world->chunks[ret.selected_chunk_x][ret.selected_chunk_y][ret.selected_chunk_z],
-                     ret.selected_block_x, ret.selected_block_y, ret.selected_block_z)->active) {
+                         ret.selected_block_x, ret.selected_block_y, ret.selected_block_z)->active) {
                 ret.selected_active = 1;
 
                 if (px >= 0 && py >= 0 && pz >= 0 &&
