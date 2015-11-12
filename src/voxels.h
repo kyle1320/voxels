@@ -17,47 +17,47 @@
 #define BIN_3(_0, _1) _0, _0, _0, _0, _0, _1, _0, _1, _0, _0, _1, _1, _1, _0, _0, _1, _0, _1, _1, _1, _0, _1, _1, _1
 
 /*
-	             3_____________ 7
-	y+  z+       /|           /|
-	| /         / |          / |
-	|/         /  |         /  |
-	o---- x+  /____________/   |
-	        2|    |        |6  |
-	         |    |________|___|
-	         |  1/         |   / 5
-	         |  /          |  /
-	         | /           | /
-	         |/____________|/
-	        0               4
+                 3_____________ 7
+    y+  z+       /|           /|
+    | /         / |          / |
+    |/         /  |         /  |
+    o---- x+  /____________/   |
+            2|    |        |6  |
+             |    |________|___|
+             |  1/         |   / 5
+             |  /          |  /
+             | /           | /
+             |/____________|/
+            0               4
 */
 
 struct Model_S;
 
 typedef struct Block_S {
-	char active;
-	Color color;
-	struct Model_S *data;
+    char active;
+    Color color;
+    struct Model_S *data;
 } Block;
 
 typedef struct Chunk_S {
-	Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
-	int x, y, z;
-	int flag;
-	Mesh *mesh;
+    Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    int x, y, z;
+    int flag;
+    Mesh *mesh;
 } Chunk;
 
 typedef struct World_S {
-	Chunk *chunks[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
+    Chunk *chunks[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
 } World;
 
 typedef struct Selection_S {
-	int selected_active;
-	int selected_chunk_x, selected_chunk_y, selected_chunk_z;
-	int selected_block_x, selected_block_y, selected_block_z;
+    int selected_active;
+    int selected_chunk_x, selected_chunk_y, selected_chunk_z;
+    int selected_block_x, selected_block_y, selected_block_z;
 
-	int previous_active;
-	int previous_chunk_x, previous_chunk_y, previous_chunk_z;
-	int previous_block_x, previous_block_y, previous_block_z;
+    int previous_active;
+    int previous_chunk_x, previous_chunk_y, previous_chunk_z;
+    int previous_block_x, previous_block_y, previous_block_z;
 } Selection;
 
 // chunks

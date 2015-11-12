@@ -3,10 +3,10 @@ CFLAGS = -Wall -std=c99 -O3 -I '/usr/local/include/'
 LIBFLAGS = -L/usr/local/lib -lglfw3 -lglew -framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo
 
 main: main.o voxels.o loadShaders.o matrix.o loadTexture.o mesh.o physics.o model.o color.o light.o
-	$(CC) $(CFLAGS) $(LIBFLAGS) -o main $^
+    $(CC) $(CFLAGS) $(LIBFLAGS) -o main $^
 
 clean:
-	rm *.o
+    rm *.o
 
 main.o:        main.c main.h voxels.h matrix.h mesh.h physics.h color.h
 voxels.o:      voxels.c voxels.h matrix.h mesh.h color.h

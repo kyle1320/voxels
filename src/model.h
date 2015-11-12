@@ -7,12 +7,12 @@
 #include "color.h"
 
 typedef struct Model_S {
-	Color blocks[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
+    Color blocks[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
 
-	GLfloat *points, *normals, *colors;
-	int n_points;
+    GLfloat *points, *normals, *colors;
+    int n_points;
 
-	Chunk *chunk;
+    Chunk *chunk;
 } Model;
 
 Model *createModel();

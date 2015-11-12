@@ -21,17 +21,17 @@
 #include "matrix.h"
 
 typedef struct Mesh_S {
-	GLenum type;
+    GLenum type;
 
-	GLuint vertexvbo;
-	GLuint normalvbo;
-	GLuint colorvbo;
-	GLuint texvbo;
-	GLuint buffer;
+    GLuint vertexvbo;
+    GLuint normalvbo;
+    GLuint colorvbo;
+    GLuint texvbo;
+    GLuint buffer;
 
-	int size;
+    int size;
 
-	mat4 modelMatrix;
+    mat4 modelMatrix;
 } Mesh;
 
 void rect(Mesh *mesh, float minx, float miny, float maxx, float maxy, float z, vec3 color);

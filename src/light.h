@@ -8,17 +8,17 @@
 
 typedef struct Light_S {
 
-	// the order of these is specifically arranged so that
-	// a Light can be passed into the shader. So, don't change.
-	vec3 position;
-	GLfloat radius;
-	vec3 color;
+    // the order of these is specifically arranged so that
+    // a Light can be passed into the shader. So, don't change.
+    vec3 position;
+    GLfloat radius;
+    vec3 color;
 
-	Mesh *mesh;
+    Mesh *mesh;
 
-	// for shadows
-	GLuint shadowMapFBO;
-	GLuint shadowMapTex;
+    // for shadows
+    GLuint shadowMapFBO;
+    GLuint shadowMapTex;
 } Light;
 
 Light *createLight(vec3 pos, vec3 color, float size, float radius);
