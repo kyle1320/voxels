@@ -8,6 +8,8 @@ This is a basic voxel engine that I wrote primarily during spring break (2015).
 
 It is a basic voxel engine written is C using OpenGL for rendering.
 
+![Screenshot from the program](http://i.imgur.com/GjtyJOd.png)
+
 Features include:
   * Basic physics engine
   * Place / destroy blocks of a chosen color
