@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "model.h"
 
@@ -133,8 +134,9 @@ int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *c
 
 void insertModel(Model *model, Block *block) {
     block->active = 1;
-    block->color.all=0;
+    block->color.all = 0;
     block->data = model;
+    block->logic = NULL;
 }
 
 void freeModel(Model *model) {
@@ -145,4 +147,38 @@ void freeModel(Model *model) {
     free(model->colors);
 
     free(model);
+}
+
+Model *rotateModel(Model *src, int times) {
+    Model *dest = createModel();
+    int x, y, z, i1, i2;
+
+    if (!(times % 4)) {
+        memcpy(dest->blocks, src->blocks, sizeof(src->blocks));
+    } else {
+        for (x = 0; x < CHUNK_SIZE; x++) {
+            for (y = 0; y < CHUNK_SIZE; y++) {
+                for (z = 0; z < CHUNK_SIZE; z++) {
+                    i1 = (((x << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + z;
+                    switch (times % 4) {
+                        case 1:
+                            i2 = ((((CHUNK_SIZE-z-1) << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + x;
+                            break;
+                        case 2:
+                            i2 = ((((CHUNK_SIZE-x-1) << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + (CHUNK_SIZE-z-1);
+                            break;
+                        case 3:
+                            i2 = (((z << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + (CHUNK_SIZE-x-1);
+                            break;
+                        default:
+                        i2 = (((x << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + z;
+                        break;
+                    }
+                    dest->blocks[i1] = src->blocks[i2];
+                }
+            }
+        }
+    }
+    renderModel(dest);
+    return dest;
 }

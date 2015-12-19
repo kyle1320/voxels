@@ -47,7 +47,8 @@ Chunk * createChunk(int x, int y, int z) {
 
 void renderChunk(Chunk *chunk) {
     // free the previously used buffers. Memory leaks are bad, mmkay.
-    freeMesh(chunk->mesh);
+    if (chunk->mesh)
+        freeMesh(chunk->mesh);
 
     // 6 faces per cube * 2 triangles per face * 3 vertices per triangle * 3 coordinates per vertex
     unsigned int max_points = countChunkSize(chunk);//6 * 6 * 3 * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
@@ -409,16 +410,16 @@ int renderChunkWithMeshing(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfl
 }
 
 void freeChunk(Chunk *chunk) {
-    /*int x, y, z;
+    int x, y, z;
 
-    for (x = 0; x < WORLD_SIZE; x++) {
-        for (y = 0; y < WORLD_SIZE; y++) {
-            for (z = 0; z < WORLD_SIZE; z++) {
-                if (getBlock(chunk, x, y, z)->data)
-                    freeChunk(getBlock(chunk, x, y, z)->data);
+    for (x = 0; x < CHUNK_SIZE; x++) {
+        for (y = 0; y < CHUNK_SIZE; y++) {
+            for (z = 0; z < CHUNK_SIZE; z++) {
+                if (getBlock(chunk, x, y, z)->logic)
+                    free(getBlock(chunk, x, y, z)->logic);
             }
         }
-    }*/
+    }
 
     freeMesh(chunk->mesh);
     free(chunk->mesh);
@@ -782,6 +783,16 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
 Block* selectedBlock(World *world, Selection* selection) {
     return &world->chunks[selection->selected_chunk_x][selection->selected_chunk_y][selection->selected_chunk_z]
                  ->blocks[selection->selected_block_x][selection->selected_block_y][selection->selected_block_z];
+}
+
+Block* worldBlock(World *world, int x, int y, int z) {
+    int world_size = WORLD_SIZE * CHUNK_SIZE;
+    if (x < 0 || y < 0 || z < 0 || x >= world_size || y >= world_size || z >= world_size) {
+        return NULL;
+    }
+
+    return &world->chunks[x >> LOG_CHUNK_SIZE][y >> LOG_CHUNK_SIZE][z >> LOG_CHUNK_SIZE]
+                 ->blocks[x & (CHUNK_SIZE-1)][y & (CHUNK_SIZE-1)][z & (CHUNK_SIZE-1)];
 }
 
 static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *indices) {

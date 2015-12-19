@@ -32,11 +32,13 @@
 */
 
 struct Model_S;
+struct Logic_S;
 
 typedef struct Block_S {
     char active;
     Color color;
     struct Model_S *data;
+    struct Logic_S *logic;
 } Block;
 
 typedef struct Chunk_S {
@@ -44,6 +46,7 @@ typedef struct Chunk_S {
     int x, y, z;
     int flag;
     Mesh *mesh;
+    char needsUpdate;
 } Chunk;
 
 typedef struct World_S {
@@ -77,6 +80,8 @@ void freeWorld(World *world);
 
 Selection selectBlock(World *world, vec3 position, vec3 direction, float radius);
 Block* selectedBlock(World *world, Selection* selection);
+
+Block* worldBlock(World *world, int x, int y, int z);
 
 int isVisible(Chunk *chunk, mat4 view, mat4 perspective);
 void setBlock(Chunk *chunk, int x, int y, int z, Block block);
