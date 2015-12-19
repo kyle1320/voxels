@@ -22,7 +22,7 @@ Features include:
   * Frustum culling
   * Triangle meshing
 
-![A binary full-adder made in the game](http://i.imgur.com/wGfYwqx.gifv)
+![A binary full-adder made in the game](http://i.imgur.com/wGfYwqx.gif)
 
 For now, the world is finite.
 
