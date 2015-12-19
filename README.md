@@ -15,11 +15,14 @@ Features include:
   * Place / destroy blocks of a chosen color
   * "Models", which are 16x16x16 chunks that fit in the space of a single normal block
   * Models can be saved to, and loaded from, files
+  * A wiring system including basic logic gates
   * Ambient, diffuse, and specular light
   * Point light shadows
   * Face culling
   * Frustum culling
   * Triangle meshing
+
+![A binary full-adder made in the game](http://i.imgur.com/wGfYwqx.gifv)
 
 For now, the world is finite.
 
