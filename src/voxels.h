@@ -4,6 +4,7 @@
 #include "matrix.h"
 #include "mesh.h"
 #include "color.h"
+// #include "logic.h"
 
 #define BLOCK_WIDTH 0.05
 #define LOG_CHUNK_SIZE 4
@@ -39,10 +40,15 @@ typedef struct Block_S {
     Color color;
     struct Model_S *data;
     struct Logic_S *logic;
+    struct Block_S *nb_pos_x, *nb_pos_y, *nb_pos_z, // neighbors
+                   *nb_neg_x, *nb_neg_y, *nb_neg_z;
 } Block;
 
 typedef struct Chunk_S {
-    Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    union {
+        Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+        Block blocks_lin[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
+    };
     int x, y, z;
     int flag;
     Mesh *mesh;
@@ -50,7 +56,10 @@ typedef struct Chunk_S {
 } Chunk;
 
 typedef struct World_S {
-    Chunk *chunks[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
+    union {
+        Chunk *chunks[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
+        Chunk *chunks_lin[WORLD_SIZE * WORLD_SIZE * WORLD_SIZE];
+    };
 } World;
 
 typedef struct Selection_S {

@@ -92,7 +92,7 @@ static double currTime = 0.0;
 
 static double mousex, mousey;
 static int mouseButtons[2] = {0, 0};
-static int control, inertia, wireframe, lightpov;
+static int control, inertia, wireframe;
 static Selection selection;
 static int placeModel = 0;
 static float colorx = 0.5, colory = 0;
@@ -146,7 +146,6 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                 sprintf(name, "models/model%ld", time(NULL));
                 writeModel(chunk, name);
                 puts("Saved model");
-                // freeModel(model1);
                 model1 = createModel();
                 readModel(model1, name);
                 free(name);
@@ -185,17 +184,6 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                 }
             }
             break;
-        /*case GLFW_KEY_BACKSLASH:
-            if (action == GLFW_PRESS) {
-                lightpov = 1;
-            } else if (action == GLFW_RELEASE) {
-                lightpov = 0;
-            }
-            break;*/
-        /*case GLFW_KEY_L:
-            if (action == GLFW_PRESS)
-                makeLight(player.position, (vec3){(float)rand() / RAND_MAX, (float)rand() / RAND_MAX, (float)rand() / RAND_MAX}, BLOCK_WIDTH, CHUNK_WIDTH*2);
-            break;*/
         case GLFW_KEY_L:
             if (action == GLFW_PRESS && selection.selected_active) {
                 Block* selected = selectedBlock(world, &selection);
@@ -204,6 +192,18 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                     selected->logic->type %= NUM_GATES;
                 } else {
                     selected->logic = calloc(1, sizeof(Logic));
+                    selected->logic->auto_orient = 1;
+                }
+                if (selected->logic->auto_orient)
+                    autoOrient(selected);
+            }
+            break;
+        case GLFW_KEY_I:
+            if (action == GLFW_PRESS && selection.selected_active) {
+                Block* selected = selectedBlock(world, &selection);
+                if (selected->logic) {
+                    selected->logic->roll++;
+                    selected->logic->auto_orient = 0;
                 }
             }
             break;
@@ -211,24 +211,17 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
             if (action == GLFW_PRESS && selection.selected_active) {
                 Block* selected = selectedBlock(world, &selection);
                 if (selected->logic) {
-                    selected->logic->rotation++;
-                    selected->logic->rotation %= 4;
-                    puts("turned");
+                    selected->logic->yaw++;
+                    selected->logic->auto_orient = 0;
                 }
             }
             break;
-        case GLFW_KEY_I:
+        case GLFW_KEY_P:
             if (action == GLFW_PRESS && selection.selected_active) {
                 Block* selected = selectedBlock(world, &selection);
                 if (selected->logic) {
-                    printf("IN: px:%d, nx:%d, pz:%d, nz:%d\n",
-                        selected->logic->input.pos_x, selected->logic->input.neg_x,
-                        selected->logic->input.pos_z, selected->logic->input.neg_z
-                    );
-                    printf("OUT: px:%d, nx:%d, pz:%d, nz:%d\n",
-                        selected->logic->output.pos_x, selected->logic->output.neg_x,
-                        selected->logic->output.pos_z, selected->logic->output.neg_z
-                    );
+                    selected->logic->pitch++;
+                    selected->logic->auto_orient = 0;
                 }
             }
             break;
@@ -592,7 +585,6 @@ void init(GLFWwindow *window) {
     control = 1;
     wireframe = 0;
     inertia = 1;
-    lightpov = 0;
 
     selection.selected_active = selection.previous_active = 0;
 
@@ -669,7 +661,7 @@ void init(GLFWwindow *window) {
     initLogicModels();
     runLogicThread(world);
 
-    // currColor.all=0xFF09FF42;
+    currColor.all=0xFF09FF42;
 }
 
 void tick(GLFWwindow *window) {
@@ -706,8 +698,8 @@ void tick(GLFWwindow *window) {
         for (int y = 0; y < WORLD_SIZE; y++) {
             for (int z = 0; z < WORLD_SIZE; z++) {
                 if (world->chunks[x][y][z]->needsUpdate) {
-                    renderChunk(world->chunks[x][y][z]);
                     world->chunks[x][y][z]->needsUpdate = 0;
+                    renderChunk(world->chunks[x][y][z]);
                 }
             }
         }
@@ -812,21 +804,7 @@ void render() {
         sendUniformData();
         glUniform1i(normalShadowMapUniformID, 0);
 
-        if (lightpov) {
-            mat4 view, projection;
-            identity_m4(view);
-            translate_m4(view, VALUES(-light[0]->position));
-            perspective(projection, 1, 90, 0.01, 100);
-            glCullFace(GL_FRONT);
-            sendViewMatrix(view);
-            sendProjectionMatrix(projection);
-
-            drawMesh(playerModel);
-            drawWorld(world, view, projection);
-            glCullFace(GL_BACK);
-        } else {
-            renderWorld(viewMatrix, projectionMatrix);
-        }
+        renderWorld(viewMatrix, projectionMatrix);
 
     // draw GUI, etc.
     useProgram(PLAIN_PROGRAM);

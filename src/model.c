@@ -120,14 +120,26 @@ void renderModel(Model *model) {
         model->n_points = renderChunkToArrays(model->chunk, model->points, model->normals, model->colors, (vec3){0, 0, 0}, 1.0);
 }
 
-int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *colors, vec3 offset, float scale) {
+int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *colors, mat4 rotate, vec3 offset, float scale) {
     int i;
 
-    for (i = 0; i < model->n_points; i++) {
-        points[i] = model->points[i] * scale + offset[i % 3];
-        normals[i] = model->normals[i];
-        colors[i] = model->colors[i];
+    for (i=0; i < model->n_points; i += 3) {
+        copy_v3(&points[i], &model->points[i]);
+        translate_v3f(&points[i], -CHUNK_WIDTH/2.0, -CHUNK_WIDTH/2.0, -CHUNK_WIDTH/2.0);
+        multiply_v3_m4(&points[i], rotate, 1.0);
+        translate_v3f(&points[i], CHUNK_WIDTH/2.0, CHUNK_WIDTH/2.0, CHUNK_WIDTH/2.0);
+        scale_v3(&points[i], scale);
+        translate_v3v(&points[i], offset);
+        copy_v3(&normals[i], &model->normals[i]);
+        multiply_v3_m4(&normals[i], rotate, 1.0);
+        copy_v3(&colors[i], &model->colors[i]);
     }
+
+    // for (i = 0; i < model->n_points; i++) {
+    //     points[i] = model->points[i] * scale + offset[i % 3];
+    //     normals[i] = model->normals[i];
+    //     colors[i] = model->colors[i];
+    // }
 
     return model->n_points;
 }
@@ -149,36 +161,7 @@ void freeModel(Model *model) {
     free(model);
 }
 
-Model *rotateModel(Model *src, int times) {
-    Model *dest = createModel();
-    int x, y, z, i1, i2;
-
-    if (!(times % 4)) {
-        memcpy(dest->blocks, src->blocks, sizeof(src->blocks));
-    } else {
-        for (x = 0; x < CHUNK_SIZE; x++) {
-            for (y = 0; y < CHUNK_SIZE; y++) {
-                for (z = 0; z < CHUNK_SIZE; z++) {
-                    i1 = (((x << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + z;
-                    switch (times % 4) {
-                        case 1:
-                            i2 = ((((CHUNK_SIZE-z-1) << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + x;
-                            break;
-                        case 2:
-                            i2 = ((((CHUNK_SIZE-x-1) << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + (CHUNK_SIZE-z-1);
-                            break;
-                        case 3:
-                            i2 = (((z << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + (CHUNK_SIZE-x-1);
-                            break;
-                        default:
-                        i2 = (((x << LOG_CHUNK_SIZE) + y) << LOG_CHUNK_SIZE) + z;
-                        break;
-                    }
-                    dest->blocks[i1] = src->blocks[i2];
-                }
-            }
-        }
-    }
+void copyModel(Model *dest, Model *src) {
+    memcpy(dest->blocks, src->blocks, sizeof(src->blocks));
     renderModel(dest);
-    return dest;
 }

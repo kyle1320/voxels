@@ -8,7 +8,10 @@
 #include "voxels.h"
 #include "main.h"
 #include "model.h"
+#include "logic.h"
 #include <time.h>
+
+#define BLOCK_MASK (CHUNK_SIZE - 1)
 
 static int countChunkSize(Chunk *chunk);
 static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *indices);
@@ -31,6 +34,8 @@ static const GLfloat cubeNormals[] = {
 static const GLuint zeroIndices[] = {
     0, 0, 0, 0, 0, 0
 };
+
+static mat4 identityMatrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
 Chunk * createChunk(int x, int y, int z) {
     Chunk *chunk = calloc(1, sizeof(Chunk));
@@ -141,14 +146,26 @@ int renderChunkToArrays(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfloat
                 }
 
                 if (block->data) {
-                    points_index += addRenderedModel(
-                        block->data,
-                        &points[points_index],
-                        &normals[points_index],
-                        &colors[points_index],
-                        (vec3){min_x, min_y, min_z},
-                        scale / CHUNK_SIZE
-                    );
+                    if (block->logic)
+                        points_index += addRenderedModel(
+                            block->data,
+                            &points[points_index],
+                            &normals[points_index],
+                            &colors[points_index],
+                            *block->logic->rotationMatrix,
+                            (vec3){min_x, min_y, min_z},
+                            scale / CHUNK_SIZE
+                        );
+                    else
+                        points_index += addRenderedModel(
+                            block->data,
+                            &points[points_index],
+                            &normals[points_index],
+                            &colors[points_index],
+                            identityMatrix,
+                            (vec3){min_x, min_y, min_z},
+                            scale / CHUNK_SIZE
+                        );
                     continue;
                 }
 
@@ -395,11 +412,18 @@ int renderChunkWithMeshing(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfl
                     voxel1 = getBlock(chunk, pos[0], pos[1], pos[2]);
 
                     if (voxel1->active && voxel1->data) {
-                        points_index += addRenderedModel(
-                                voxel1->data, &points[points_index], &normals[points_index], &colors[points_index],
-                                (vec3){pos[0]*blockWidth + offset[0], pos[1]*blockWidth + offset[1], pos[2]*blockWidth + offset[2]},
-                                scale / CHUNK_SIZE
-                            );
+                        if (voxel1->logic)
+                            points_index += addRenderedModel(
+                                    voxel1->data, &points[points_index], &normals[points_index], &colors[points_index], *voxel1->logic->rotationMatrix,
+                                    (vec3){pos[0]*blockWidth + offset[0], pos[1]*blockWidth + offset[1], pos[2]*blockWidth + offset[2]},
+                                    scale / CHUNK_SIZE
+                                );
+                        else
+                            points_index += addRenderedModel(
+                                    voxel1->data, &points[points_index], &normals[points_index], &colors[points_index], identityMatrix,
+                                    (vec3){pos[0]*blockWidth + offset[0], pos[1]*blockWidth + offset[1], pos[2]*blockWidth + offset[2]},
+                                    scale / CHUNK_SIZE
+                                );
                     }
                 }
             }
@@ -426,6 +450,12 @@ void freeChunk(Chunk *chunk) {
     free(chunk);
 }
 
+// World *readWorld(char *filename) {
+//     World *world = createWorld();
+//
+//
+// }
+
 World * createWorld() {
     World *world = malloc(sizeof(World));
 
@@ -438,6 +468,26 @@ World * createWorld() {
             }
         }
     }
+
+    #define WORLD_BLOCK_WIDTH WORLD_SIZE * CHUNK_SIZE
+
+    // link neighbors in the world
+    for (x = 0; x < WORLD_BLOCK_WIDTH; x++) {
+        for (y = 0; y < WORLD_BLOCK_WIDTH; y++) {
+            for (z = 0; z < WORLD_BLOCK_WIDTH; z++) {
+                Block *block = worldBlock(world, x, y, z);
+
+                block->nb_pos_x = worldBlock(world, x+1, y, z);
+                block->nb_neg_x = worldBlock(world, x-1, y, z);
+                block->nb_pos_y = worldBlock(world, x, y+1, z);
+                block->nb_neg_y = worldBlock(world, x, y-1, z);
+                block->nb_pos_z = worldBlock(world, x, y, z+1);
+                block->nb_neg_z = worldBlock(world, x, y, z-1);
+            }
+        }
+    }
+
+    #undef WORLD_BLOCK_WIDTH
 
     return world;
 }
@@ -453,11 +503,11 @@ void fillWorld(World *world) {
                         for (bz = 0; bz < CHUNK_SIZE; bz++) {
                             int m = (bx + by + bz) % 2 ? -1 : (-1 << 6);
                             if (by == 0 && cy == 0) {
-                                *getBlock(world->chunks[cx][cy][cz], bx, by, bz) =
-                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}};
+                                setBlock(world->chunks[cx][cy][cz], bx, by, bz,
+                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
                             } else if (((bx == 0 && cx == 0) || (bz == 0 && cz == 0)) && by == 1 && cy == 0) {
-                                *getBlock(world->chunks[cx][cy][cz], bx, by, bz) =
-                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}};
+                                setBlock(world->chunks[cx][cy][cz], bx, by, bz,
+                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
                             }
                         }
                     }
@@ -500,6 +550,15 @@ void freeWorld(World *world) {
 }
 
 void setBlock(Chunk *chunk, int x, int y, int z, Block block) {
+    Block *current = getBlock(chunk, x, y, z);
+
+    block.nb_pos_x = current->nb_pos_x;
+    block.nb_neg_x = current->nb_neg_x;
+    block.nb_pos_y = current->nb_pos_y;
+    block.nb_neg_y = current->nb_neg_y;
+    block.nb_pos_z = current->nb_pos_z;
+    block.nb_neg_z = current->nb_neg_z;
+
     *getBlock(chunk, x, y, z) = block;
     renderChunk(chunk);
 }
@@ -658,9 +717,9 @@ int solidBlockInArea(World *world, int minx, int miny, int minz, int maxx, int m
     for (x = minx; x < maxx; x++) {
         for (y = miny; y < maxy; y++) {
             for (z = minz; z < maxz; z++) {
-                bx = x & (CHUNK_SIZE - 1);
-                by = y & (CHUNK_SIZE - 1);
-                bz = z & (CHUNK_SIZE - 1);
+                bx = x & BLOCK_MASK;
+                by = y & BLOCK_MASK;
+                bz = z & BLOCK_MASK;
                 cx = x >> LOG_CHUNK_SIZE;
                 cy = y >> LOG_CHUNK_SIZE;
                 cz = z >> LOG_CHUNK_SIZE;
@@ -723,9 +782,9 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
             ret.selected_chunk_x = x >> LOG_CHUNK_SIZE;
             ret.selected_chunk_y = y >> LOG_CHUNK_SIZE;
             ret.selected_chunk_z = z >> LOG_CHUNK_SIZE;
-            ret.selected_block_x = x & (CHUNK_SIZE - 1);
-            ret.selected_block_y = y & (CHUNK_SIZE - 1);
-            ret.selected_block_z = z & (CHUNK_SIZE - 1);
+            ret.selected_block_x = x & BLOCK_MASK;
+            ret.selected_block_y = y & BLOCK_MASK;
+            ret.selected_block_z = z & BLOCK_MASK;
 
             // now check if the block is solid
             if (getBlock(world->chunks[ret.selected_chunk_x][ret.selected_chunk_y][ret.selected_chunk_z],
@@ -740,9 +799,9 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
                     ret.previous_chunk_x = px >> LOG_CHUNK_SIZE;
                     ret.previous_chunk_y = py >> LOG_CHUNK_SIZE;
                     ret.previous_chunk_z = pz >> LOG_CHUNK_SIZE;
-                    ret.previous_block_x = px & (CHUNK_SIZE - 1);
-                    ret.previous_block_y = py & (CHUNK_SIZE - 1);
-                    ret.previous_block_z = pz & (CHUNK_SIZE - 1);
+                    ret.previous_block_x = px & BLOCK_MASK;
+                    ret.previous_block_y = py & BLOCK_MASK;
+                    ret.previous_block_z = pz & BLOCK_MASK;
                     ret.previous_active = 1;
                 }
 
@@ -786,13 +845,13 @@ Block* selectedBlock(World *world, Selection* selection) {
 }
 
 Block* worldBlock(World *world, int x, int y, int z) {
-    int world_size = WORLD_SIZE * CHUNK_SIZE;
-    if (x < 0 || y < 0 || z < 0 || x >= world_size || y >= world_size || z >= world_size) {
+    #define WORLD_BLOCK_WIDTH WORLD_SIZE * CHUNK_SIZE
+    if (x < 0 || y < 0 || z < 0 || x >= WORLD_BLOCK_WIDTH || y >= WORLD_BLOCK_WIDTH || z >= WORLD_BLOCK_WIDTH)
         return NULL;
-    }
 
     return &world->chunks[x >> LOG_CHUNK_SIZE][y >> LOG_CHUNK_SIZE][z >> LOG_CHUNK_SIZE]
-                 ->blocks[x & (CHUNK_SIZE-1)][y & (CHUNK_SIZE-1)][z & (CHUNK_SIZE-1)];
+                 ->blocks[x & BLOCK_MASK][y & BLOCK_MASK][z & BLOCK_MASK];
+    #undef WORLD_BLOCK_WIDTH
 }
 
 static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *indices) {
@@ -803,3 +862,5 @@ static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *i
     memcpy((void*)&dest[4*3], (void*)&src[indices[4]*3], 3 * sizeof(GLfloat));
     memcpy((void*)&dest[5*3], (void*)&src[indices[5]*3], 3 * sizeof(GLfloat));
 }
+
+#undef BLOCK_MASK
