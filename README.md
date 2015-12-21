@@ -22,7 +22,8 @@ Features include:
   * Frustum culling
   * Triangle meshing
 
-![A binary full-adder made in the game](http://i.imgur.com/wGfYwqx.gif)
+<img src="http://i.imgur.com/iGvxO6X.png" alt="A 4-bit register made in the game" height="300px" style="padding-right: 50px";>
+<img src="http://i.imgur.com/Hso8R2q.png" alt="A 8x1 multiplexer made in the game" height="300px">
 
 For now, the world is finite.
 
