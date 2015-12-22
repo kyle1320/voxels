@@ -49,9 +49,9 @@ static void sendViewMatrix(mat4 data);
 static void sendModelMatrix(mat4 data);
 static void sendUniformData();
 
-static void makeLight(vec3 position, vec3 color, float size, float radius);
+// static void makeLight(vec3 position, vec3 color, float size, float radius);
 
-static void renderShadowMap();
+// static void renderShadowMap();
 static void renderWorld(mat4 view, mat4 projection);
 
 int frame_buffer_width = 0;
@@ -63,16 +63,16 @@ static mat4 identityMatrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
 static ProgramType currProgram;
 
-static GLuint normalProgram, shadowProgram, plainProgram, textureProgram, skyboxProgram;
+static GLuint normalProgram, /*shadowProgram,*/ plainProgram, textureProgram, skyboxProgram;
 static GLuint vao;
-static GLuint normalLightUBO, normalMaterialsUBO;
+static GLuint /*normalLightUBO,*/ normalMaterialsUBO;
 static GLuint normalModelUniformID, normalViewUniformID,
-              normalProjectionUniformID, normalShadowMapUniformID,
-              normalLightCountUniformID,
+              normalProjectionUniformID, /*normalShadowMapUniformID,
+              normalLightCountUniformID,*/
 
-              shadowLightSourceUniformID, shadowModelUniformID,
+              /*shadowLightSourceUniformID, shadowModelUniformID,
               shadowViewUniformID, shadowProjectionUniformID,
-              shadowLightRadiusUniformID,
+              shadowLightRadiusUniformID,*/
 
               plainModelUniformID, plainViewUniformID,
               plainProjectionUniformID,
@@ -98,8 +98,8 @@ static int placeModel = 0;
 static float colorx = 0.5, colory = 0;
 static Color currColor;
 
-static Light *light[MAX_LIGHTS];
-static int lightCount = 0;
+// static Light *light[MAX_LIGHTS];
+// static int lightCount = 0;
 static World *world;
 static Mesh *playerModel;
 static Mesh *selectedFrame;
@@ -139,9 +139,9 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
             break;
         case GLFW_KEY_1:
             if (action == GLFW_RELEASE) {
-                Chunk *chunk = world->chunks[(int)(player.position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE]
-                                            [(int)(player.position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE]
-                                            [(int)(player.position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE];
+                Chunk *chunk = getChunk(world, (int)(player.position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                            (int)(player.position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                            (int)(player.position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE);
                 char* name = malloc(40);
                 sprintf(name, "models/model%ld", time(NULL));
                 writeModel(chunk, name);
@@ -149,6 +149,20 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                 model1 = createModel();
                 readModel(model1, name);
                 free(name);
+            }
+            break;
+        case GLFW_KEY_2:
+            if (action == GLFW_RELEASE) {
+                writeWorld(world, "worlds/saved");
+                puts("Saved world");
+            }
+            break;
+        case GLFW_KEY_3:
+            if (action == GLFW_RELEASE) {
+                copyChunk(getChunk(world, (int)(player.position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                          (int)(player.position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                          (int)(player.position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE),
+                          model1->chunk);
             }
             break;
         case GLFW_KEY_E:
@@ -173,14 +187,10 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
         case GLFW_KEY_EQUAL:
             if (action == GLFW_PRESS) {
                 useMeshing = !useMeshing;
-                int x, y, z;
+                int i;
                 renderModel(model1);
-                for (x = 0; x < WORLD_SIZE; x++) {
-                    for (y = 0; y < WORLD_SIZE; y++) {
-                        for (z = 0; z < WORLD_SIZE; z++) {
-                            renderChunk(world->chunks[x][y][z]);
-                        }
-                    }
+                for (i = 0; i < world->num_chunks; i++) {
+                    renderChunk(world->chunks[i]);
                 }
             }
             break;
@@ -271,7 +281,7 @@ static void readInputs(GLFWwindow* window) {
 
         if (newMouseButtons[0] && !mouseButtons[0])
             if (selection.selected_active) {
-                setBlock(world->chunks[selection.selected_chunk_x][selection.selected_chunk_y][selection.selected_chunk_z],
+                setBlock(getChunk(world, selection.selected_chunk_x, selection.selected_chunk_y, selection.selected_chunk_z),
                          selection.selected_block_x, selection.selected_block_y, selection.selected_block_z, (Block){0, {.all=0}, NULL, NULL});
             }
 
@@ -280,10 +290,10 @@ static void readInputs(GLFWwindow* window) {
                 if (placeModel) {
                     Block block;
                     insertModel(model1, &block);
-                    setBlock(world->chunks[selection.previous_chunk_x][selection.previous_chunk_y][selection.previous_chunk_z],
+                    setBlock(getChunk(world, selection.previous_chunk_x, selection.previous_chunk_y, selection.previous_chunk_z),
                              selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, block);
                 } else
-                    setBlock(world->chunks[selection.previous_chunk_x][selection.previous_chunk_y][selection.previous_chunk_z],
+                    setBlock(getChunk(world, selection.previous_chunk_x, selection.previous_chunk_y, selection.previous_chunk_z),
                              selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, (Block){1, currColor, NULL, NULL});
             }
 
@@ -367,9 +377,9 @@ static void useProgram(ProgramType prog) {
         case NORMAL_PROGRAM:
             glUseProgram(normalProgram);
             break;
-        case SHADOW_PROGRAM:
-            glUseProgram(shadowProgram);
-            break;
+        // case SHADOW_PROGRAM:
+        //     glUseProgram(shadowProgram);
+        //     break;
         case PLAIN_PROGRAM:
             glUseProgram(plainProgram);
             break;
@@ -389,9 +399,9 @@ static void sendProjectionMatrix(mat4 data) {
         case NORMAL_PROGRAM:
             glUniformMatrix4fv(normalProjectionUniformID, 1, GL_TRUE, data);
             break;
-        case SHADOW_PROGRAM:
-            glUniformMatrix4fv(shadowProjectionUniformID, 1, GL_TRUE, data);
-            break;
+        // case SHADOW_PROGRAM:
+        //     glUniformMatrix4fv(shadowProjectionUniformID, 1, GL_TRUE, data);
+        //     break;
         case PLAIN_PROGRAM:
             glUniformMatrix4fv(plainProjectionUniformID, 1, GL_TRUE, data);
             break;
@@ -411,9 +421,9 @@ static void sendViewMatrix(mat4 data) {
         case NORMAL_PROGRAM:
             glUniformMatrix4fv(normalViewUniformID, 1, GL_TRUE, data);
             break;
-        case SHADOW_PROGRAM:
-            glUniformMatrix4fv(shadowViewUniformID, 1, GL_TRUE, data);
-            break;
+        // case SHADOW_PROGRAM:
+        //     glUniformMatrix4fv(shadowViewUniformID, 1, GL_TRUE, data);
+        //     break;
         case PLAIN_PROGRAM:
             glUniformMatrix4fv(plainViewUniformID, 1, GL_TRUE, data);
             break;
@@ -433,9 +443,9 @@ static void sendModelMatrix(mat4 data) {
         case NORMAL_PROGRAM:
             glUniformMatrix4fv(normalModelUniformID, 1, GL_TRUE, data);
             break;
-        case SHADOW_PROGRAM:
-            glUniformMatrix4fv(shadowModelUniformID, 1, GL_TRUE, data);
-            break;
+        // case SHADOW_PROGRAM:
+        //     glUniformMatrix4fv(shadowModelUniformID, 1, GL_TRUE, data);
+        //     break;
         case PLAIN_PROGRAM:
             glUniformMatrix4fv(plainModelUniformID, 1, GL_TRUE, data);
             break;
@@ -451,31 +461,31 @@ static void sendModelMatrix(mat4 data) {
 }
 
 static void sendUniformData() {
-    GLfloat lightData[8 * MAX_LIGHTS];
-    int i;
+    // GLfloat lightData[8 * MAX_LIGHTS];
+    // int i;
 
     switch (currProgram) {
         case NORMAL_PROGRAM:
-            for (i = 0; i < lightCount; i++)
-                memcpy(&lightData[i * 8], light[i], 8 * sizeof(GLfloat));
-            glBindBuffer(GL_UNIFORM_BUFFER, normalLightUBO);
-            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(GLfloat) * 8 * MAX_LIGHTS, lightData);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-            glUniform1i(normalLightCountUniformID, lightCount);
+            // for (i = 0; i < lightCount; i++)
+            //     memcpy(&lightData[i * 8], light[i], 8 * sizeof(GLfloat));
+            // glBindBuffer(GL_UNIFORM_BUFFER, normalLightUBO);
+            // glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(GLfloat) * 8 * MAX_LIGHTS, lightData);
+            // glBindBuffer(GL_UNIFORM_BUFFER, 0);
+            // glUniform1i(normalLightCountUniformID, lightCount);
             break;
-        case SHADOW_PROGRAM:
-            glUniform3f(shadowLightSourceUniformID, VALUES(light[0]->position));
-            glUniform1f(shadowLightRadiusUniformID, light[0]->radius);
-            break;
+        // case SHADOW_PROGRAM:
+        //     // glUniform3f(shadowLightSourceUniformID, VALUES(light[0]->position));
+        //     // glUniform1f(shadowLightRadiusUniformID, light[0]->radius);
+        //     break;
         default:
             break;
     }
 }
 
-static void makeLight(vec3 position, vec3 color, float size, float radius) {
-    if (lightCount < MAX_LIGHTS)
-        light[lightCount++] = createLight(position, color, size, radius);
-}
+// static void makeLight(vec3 position, vec3 color, float size, float radius) {
+//     if (lightCount < MAX_LIGHTS)
+//         light[lightCount++] = createLight(position, color, size, radius);
+// }
 
 void drawMesh(Mesh * mesh) {
     // don't render an empty mesh :p
@@ -527,7 +537,7 @@ void init(GLFWwindow *window) {
     /* load shaders */
 
     normalProgram  = loadShaders("shaders/normalShader.vert", "shaders/normalShader.frag");
-    shadowProgram  = loadShaders("shaders/shadowShader.vert", "shaders/shadowShader.frag");
+    // shadowProgram  = loadShaders("shaders/shadowShader.vert", "shaders/shadowShader.frag");
     plainProgram   = loadShaders("shaders/plainShader.vert", "shaders/plainShader.frag");
     textureProgram = loadShaders("shaders/textureShader.vert", "shaders/textureShader.frag");
     skyboxProgram  = loadShaders("shaders/skyboxShader.vert", "shaders/skyboxShader.frag");
@@ -539,14 +549,10 @@ void init(GLFWwindow *window) {
     #if 0
     useMeshing = 1;
     float before = glfwGetTime();
-    int i, x, y, z;
+    int i, j;
     for (i = 0; i < 100; i++) {
-        for (x = 0; x < WORLD_SIZE; x++) {
-            for (y = 0; y < WORLD_SIZE; y++) {
-                for (z = 0; z < WORLD_SIZE; z++) {
-                    renderChunk(world->chunks[x][y][z]);
-                }
-            }
+        for (j = 0; j < world->num_chunks; j++) {
+            renderChunk(world->chunks[j]);
         }
     }
     float delta = glfwGetTime() - before;
@@ -556,17 +562,21 @@ void init(GLFWwindow *window) {
 
     /* meshes, etc. */
 
-    player = (Player){{WORLD_WIDTH/2, WORLD_WIDTH, WORLD_WIDTH/2}, {0, 0, -1}, {0, 0, 0},
+    // world = createWorld(6);
+    // fillWorld(world);
+
+    world = readWorld("worlds/saved");
+
+    float world_width = world->size * CHUNK_WIDTH;
+
+    player = (Player){{world_width/2, world_width, world_width/2}, {0, 0, -1}, {0, 0, 0},
                       0.0, 0.0,
                       {{-.4f*BLOCK_WIDTH, -2.5f*BLOCK_WIDTH, -.4f*BLOCK_WIDTH},
                       {.8f*BLOCK_WIDTH, 2.8f*BLOCK_WIDTH, .8f*BLOCK_WIDTH}}};
 
-    world = createWorld();
-    fillWorld(world);
-
-    makeLight((vec3){0, 0, 0}, (vec3){1, 1, 1}, BLOCK_WIDTH, CHUNK_WIDTH*2);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, light[0]->shadowMapTex);
+    // makeLight((vec3){0, 0, 0}, (vec3){1, 1, 1}, BLOCK_WIDTH, CHUNK_WIDTH*2);
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_CUBE_MAP, light[0]->shadowMapTex);
 
     playerModel    = malloc(sizeof(Mesh));
     selectedFrame  = malloc(sizeof(Mesh));
@@ -577,8 +587,10 @@ void init(GLFWwindow *window) {
 
     initMeshes();
 
+    initLogicModels();
+
     model1 = createModel();
-    readModel(model1, "models/model_frame");
+    readModel(model1, "models/model1");
 
     /* control / option variables */
 
@@ -590,20 +602,20 @@ void init(GLFWwindow *window) {
 
     /* get shader uniforms */
 
-    glGenBuffers(1, &normalLightUBO);
+    // glGenBuffers(1, &normalLightUBO);
     glGenBuffers(1, &normalMaterialsUBO);
 
-    glBindBuffer(GL_UNIFORM_BUFFER, normalLightUBO);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(GLfloat) * 8 * MAX_LIGHTS, NULL, GL_STREAM_DRAW);
-    glUniformBlockBinding(normalProgram, glGetUniformBlockIndex(normalProgram, "Light"), 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, normalLightUBO);
+    // glBindBuffer(GL_UNIFORM_BUFFER, normalLightUBO);
+    // glBufferData(GL_UNIFORM_BUFFER, sizeof(GLfloat) * 8 * MAX_LIGHTS, NULL, GL_STREAM_DRAW);
+    // glUniformBlockBinding(normalProgram, glGetUniformBlockIndex(normalProgram, "Light"), 0);
+    // glBindBufferBase(GL_UNIFORM_BUFFER, 0, normalLightUBO);
 
     glBindBuffer(GL_UNIFORM_BUFFER, normalMaterialsUBO);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(GLfloat) * 12, NULL, GL_STATIC_DRAW);
     glUniformBlockBinding(normalProgram, glGetUniformBlockIndex(normalProgram, "Materials"), 1);
     glBindBufferBase(GL_UNIFORM_BUFFER, 1, normalMaterialsUBO);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(GLfloat) * 12, (GLfloat[]) {
-        0.5, 0.5, 0.5, 0, // diffuse
+        0.3, 0.3, 0.3, 0, // diffuse
         0.7, 0.7, 0.7, 0, // ambient
         0.1, 0.1, 0.1, 0, // specular
     });
@@ -613,14 +625,14 @@ void init(GLFWwindow *window) {
     normalModelUniformID      = glGetUniformLocation(normalProgram, "modelMatrix");
     normalViewUniformID       = glGetUniformLocation(normalProgram, "viewMatrix");
     normalProjectionUniformID = glGetUniformLocation(normalProgram, "projectionMatrix");
-    normalLightCountUniformID = glGetUniformLocation(normalProgram, "lightCount");
-    normalShadowMapUniformID  = glGetUniformLocation(normalProgram, "shadowMap");
+    // normalLightCountUniformID = glGetUniformLocation(normalProgram, "lightCount");
+    // normalShadowMapUniformID  = glGetUniformLocation(normalProgram, "shadowMap");
 
-    shadowLightSourceUniformID = glGetUniformLocation(shadowProgram, "lightSource");
-    shadowModelUniformID       = glGetUniformLocation(shadowProgram, "modelMatrix");
-    shadowViewUniformID        = glGetUniformLocation(shadowProgram, "viewMatrix");
-    shadowProjectionUniformID  = glGetUniformLocation(shadowProgram, "projectionMatrix");
-    shadowLightRadiusUniformID = glGetUniformLocation(shadowProgram, "lightRadius");
+    // shadowLightSourceUniformID = glGetUniformLocation(shadowProgram, "lightSource");
+    // shadowModelUniformID       = glGetUniformLocation(shadowProgram, "modelMatrix");
+    // shadowViewUniformID        = glGetUniformLocation(shadowProgram, "viewMatrix");
+    // shadowProjectionUniformID  = glGetUniformLocation(shadowProgram, "projectionMatrix");
+    // shadowLightRadiusUniformID = glGetUniformLocation(shadowProgram, "lightRadius");
 
     plainModelUniformID      = glGetUniformLocation(plainProgram, "modelMatrix");
     plainViewUniformID       = glGetUniformLocation(plainProgram, "viewMatrix");
@@ -658,10 +670,9 @@ void init(GLFWwindow *window) {
 
     glViewport(0, 0, frame_buffer_width, frame_buffer_height);
 
-    initLogicModels();
     runLogicThread(world);
 
-    currColor.all=0xFF09FF42;
+    // currColor.all=0xFF09FF42;
 }
 
 void tick(GLFWwindow *window) {
@@ -670,11 +681,11 @@ void tick(GLFWwindow *window) {
     deltaTime = newTime - currTime;
     currTime = newTime;
 
-    moveLight(light[0], (vec3) {
-        player.position[0] + (cos(currTime)*2)*BLOCK_WIDTH*5,
-        player.position[1],// + BLOCK_WIDTH*2,
-        player.position[2] + (sin(currTime)*2)*BLOCK_WIDTH*5
-    });
+    // moveLight(light[0], (vec3) {
+    //     player.position[0] + (cos(currTime)*2)*BLOCK_WIDTH*5,
+    //     player.position[1],// + BLOCK_WIDTH*2,
+    //     player.position[2] + (sin(currTime)*2)*BLOCK_WIDTH*5
+    // });
 
     /*moveLight(light, (vec3) {
         BLOCK_WIDTH*20,
@@ -694,92 +705,88 @@ void tick(GLFWwindow *window) {
     rotate_Y_m4(playerModel->modelMatrix, -player.horizontalAngle);
     translate_m4(playerModel->modelMatrix, VALUES(player.position));
 
-    for (int x = 0; x < WORLD_SIZE; x++) {
-        for (int y = 0; y < WORLD_SIZE; y++) {
-            for (int z = 0; z < WORLD_SIZE; z++) {
-                if (world->chunks[x][y][z]->needsUpdate) {
-                    world->chunks[x][y][z]->needsUpdate = 0;
-                    renderChunk(world->chunks[x][y][z]);
-                }
-            }
+    for (int i = 0; i < world->num_chunks; i++) {
+        if (world->chunks[i]->needsUpdate) {
+            world->chunks[i]->needsUpdate = 0;
+            renderChunk(world->chunks[i]);
         }
     }
 
     render();
 }
 
-static void renderShadowMap() {
-    mat4 projection;
-
-    // 90 degree FOV for cube faces
-    perspective(projection, 1, 90, 0.01, 100);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, light[0]->shadowMapFBO);
-    glViewport(0, 0, SHADOW_RES, SHADOW_RES);
-
-    // HOW THE HELL IS A CUBEMAP ORIENTED >_>
-    // DONOTTOUCH. DON'T EVENT THINK ABOUT IT.
-    // but I guess you can note that the translation is accounted for to cut down
-    // on matrix calculations. It's as if we applied the transformation
-    // -light->position and then applied the transformations mentioned.
-    // STILL DON'T TOUCH. LIKE, AT ALL. EVER.
-    mat4 faces[6] = {
-        { 0,  0, -1,  light[0]->position[2],
-          0, -1,  0,  light[0]->position[1],
-          1,  0,  0, -light[0]->position[0],
-          0,  0,  0,  1}, //rotation_Y(-PI/2), flip_y
-
-        { 0,  0,  1, -light[0]->position[2],
-          0, -1,  0,  light[0]->position[1],
-         -1,  0,  0,  light[0]->position[0],
-          0,  0,  0,  1}, //rotation_Y( PI/2), flip_y
-
-        { 1,  0,  0, -light[0]->position[0],
-          0,  0,  1, -light[0]->position[2],
-          0,  1,  0, -light[0]->position[1],
-          0,  0,  0,  1}, //rotation_X(-PI/2), flip_z
-
-        { 1,  0,  0, -light[0]->position[0],
-          0,  0, -1,  light[0]->position[2],
-          0, -1,  0,  light[0]->position[1],
-          0,  0,  0,  1}, //rotation_X( PI/2), flip_z
-
-        { 1,  0,  0, -light[0]->position[0],
-          0, -1,  0,  light[0]->position[1],
-          0,  0,  1, -light[0]->position[2],
-          0,  0,  0,  1}, //rotation_Y(    0), flip_y
-
-        {-1,  0,  0,  light[0]->position[0],
-          0, -1,  0,  light[0]->position[1],
-          0,  0, -1,  light[0]->position[2],
-          0,  0,  0,  1}, //rotation_Y(   PI), flip_y
-    };
-
-    // to avoid shadow acne
-    glCullFace(GL_FRONT);
-
-    int i;
-    for (i = 0; i < 6; i++) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, light[0]->shadowMapTex, 0);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        renderWorld(faces[i], projection);
-    }
-
-    glCullFace(GL_BACK);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, frame_buffer_width, frame_buffer_height);
-}
+// static void renderShadowMap() {
+//     mat4 projection;
+//
+//     // 90 degree FOV for cube faces
+//     perspective(projection, 1, 90, 0.01, 100);
+//
+//     glBindFramebuffer(GL_FRAMEBUFFER, light[0]->shadowMapFBO);
+//     glViewport(0, 0, SHADOW_RES, SHADOW_RES);
+//
+//     // HOW THE HELL IS A CUBEMAP ORIENTED >_>
+//     // DONOTTOUCH. DON'T EVENT THINK ABOUT IT.
+//     // but I guess you can note that the translation is accounted for to cut down
+//     // on matrix calculations. It's as if we applied the transformation
+//     // -light->position and then applied the transformations mentioned.
+//     // STILL DON'T TOUCH. LIKE, AT ALL. EVER.
+//     mat4 faces[6] = {
+//         { 0,  0, -1,  light[0]->position[2],
+//           0, -1,  0,  light[0]->position[1],
+//           1,  0,  0, -light[0]->position[0],
+//           0,  0,  0,  1}, //rotation_Y(-PI/2), flip_y
+//
+//         { 0,  0,  1, -light[0]->position[2],
+//           0, -1,  0,  light[0]->position[1],
+//          -1,  0,  0,  light[0]->position[0],
+//           0,  0,  0,  1}, //rotation_Y( PI/2), flip_y
+//
+//         { 1,  0,  0, -light[0]->position[0],
+//           0,  0,  1, -light[0]->position[2],
+//           0,  1,  0, -light[0]->position[1],
+//           0,  0,  0,  1}, //rotation_X(-PI/2), flip_z
+//
+//         { 1,  0,  0, -light[0]->position[0],
+//           0,  0, -1,  light[0]->position[2],
+//           0, -1,  0,  light[0]->position[1],
+//           0,  0,  0,  1}, //rotation_X( PI/2), flip_z
+//
+//         { 1,  0,  0, -light[0]->position[0],
+//           0, -1,  0,  light[0]->position[1],
+//           0,  0,  1, -light[0]->position[2],
+//           0,  0,  0,  1}, //rotation_Y(    0), flip_y
+//
+//         {-1,  0,  0,  light[0]->position[0],
+//           0, -1,  0,  light[0]->position[1],
+//           0,  0, -1,  light[0]->position[2],
+//           0,  0,  0,  1}, //rotation_Y(   PI), flip_y
+//     };
+//
+//     // to avoid shadow acne
+//     glCullFace(GL_FRONT);
+//
+//     int i;
+//     for (i = 0; i < 6; i++) {
+//         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, light[0]->shadowMapTex, 0);
+//         glClear(GL_DEPTH_BUFFER_BIT);
+//
+//         renderWorld(faces[i], projection);
+//     }
+//
+//     glCullFace(GL_BACK);
+//
+//     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//     glViewport(0, 0, frame_buffer_width, frame_buffer_height);
+// }
 
 static void renderWorld(mat4 view, mat4 projection) {
     sendViewMatrix(view);
     sendProjectionMatrix(projection);
 
-        // draw the light source
-        int i;
-        for (i = 0; i < lightCount; i++)
-            drawMesh(light[i]->mesh);
+    // draw the light source
+    // int i;
+    // for (i = 0; i < lightCount; i++)
+    //     drawMesh(light[i]->mesh);
 
     // draw the player
     drawMesh(playerModel);
@@ -792,17 +799,17 @@ void render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // draw the shadow map
-    useProgram(SHADOW_PROGRAM);
-
-        sendUniformData();
-
-        renderShadowMap();
+    // useProgram(SHADOW_PROGRAM);
+    //
+    //     sendUniformData();
+    //
+    //     renderShadowMap();
 
     // draw the world
     useProgram(NORMAL_PROGRAM);
 
         sendUniformData();
-        glUniform1i(normalShadowMapUniformID, 0);
+        // glUniform1i(normalShadowMapUniformID, 0);
 
         renderWorld(viewMatrix, projectionMatrix);
 
@@ -852,12 +859,12 @@ void finish() {
     stopLogicThread();
     freeLogicModels();
 
-    int i;
-    for (i = 0; i < lightCount; i++)
-        freeLight(light[i]);
+    // int i;
+    // for (i = 0; i < lightCount; i++)
+    //     freeLight(light[i]);
     freeWorld(world);
 
-    freeMesh(selectedFrame);
+    // freeMesh(selectedFrame);
     free(selectedFrame);
 
     freeMesh(crosshair);
@@ -866,7 +873,7 @@ void finish() {
     freeMesh(colorChooser);
     free(colorChooser);
 
-    freeModel(model1);
+    // freeModel(model1);
 
     glfwTerminate();
 }

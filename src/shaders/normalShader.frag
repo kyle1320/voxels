@@ -2,21 +2,21 @@
 
 in vec3 fragmentColor;
 in vec3 normal_cameraspace;
-in vec3 lightDirection_cameraspace[10];
-in vec3 lightDirection_worldspace[10];
+// in vec3 lightDirection_cameraspace[10];
+// in vec3 lightDirection_worldspace[10];
 in vec3 eyeDirection_cameraspace;
 
-struct LightInfo {
-	vec4 positionRadius;
-	vec4 color;
-};
+// struct LightInfo {
+// 	vec4 positionRadius;
+// 	vec4 color;
+// };
+//
+// layout(std140) uniform Light {
+// 	LightInfo light[10];
+// };
+// uniform int lightCount;
 
-layout(std140) uniform Light {
-	LightInfo light[10];
-};
-uniform int lightCount;
-
-uniform samplerCube shadowMap;
+// uniform samplerCube shadowMap;
 
 layout(std140) uniform Materials {
 	vec3 materialDiffuseColor;
@@ -29,7 +29,8 @@ out vec3 color;
 void main()
 {
 	vec3 n = normalize(normal_cameraspace);
-	vec3 l = normalize(lightDirection_cameraspace[0]);
+	// vec3 l = normalize(lightDirection_cameraspace[0]);
+	vec3 l = normalize(eyeDirection_cameraspace);
 
 	float cosTheta = clamp(dot(n, l), 0, 1);
 
@@ -38,20 +39,20 @@ void main()
 
 	float cosAlpha = clamp(dot(E, R), 0, 1);
 
-	float distance = length(lightDirection_worldspace[0]) / light[0].positionRadius.w;
-	float shadowDist = texture(shadowMap, -lightDirection_worldspace[0]).r;
-	float shadow = 1 - distance;
-
-	float bias = clamp(0.001*tan(acos(cosTheta)), 0, 1);
-
-	if (distance > shadowDist + bias) {
-		shadow = 0;
-	}
+	// float distance = length(lightDirection_worldspace[0]) / light[0].positionRadius.w;
+	// float shadowDist = texture(shadowMap, -lightDirection_worldspace[0]).r;
+	// float shadow = 1 - distance;
+	//
+	// float bias = clamp(0.001*tan(acos(cosTheta)), 0, 1);
+	//
+	// if (distance > shadowDist + bias) {
+	// 	shadow = 0;
+	// }
 
 	//float shadow = 1;//texture(shadowMap, vec4(-lightDirection_worldspace, 0));
 
 	color = (materialDiffuseColor * cosTheta * fragmentColor  +
-				materialSpecularColor * pow(cosAlpha, 5)) * lightCount * light[0].color.rgb * shadow +
+				materialSpecularColor * pow(cosAlpha, 5)) + // * lightCount * light[0].color.rgb * shadow +
 				materialAmbientColor * fragmentColor;
 
 }
