@@ -10,10 +10,9 @@
 #define LOG_CHUNK_SIZE 4
 #define CHUNK_SIZE (1 << LOG_CHUNK_SIZE)
 #define CHUNK_WIDTH (CHUNK_SIZE * BLOCK_WIDTH)
-#define WORLD_SIZE 6
-#define WORLD_WIDTH (WORLD_SIZE * CHUNK_WIDTH)
 
 #define getBlock(chunk, x, y, z) (&chunk->blocks[x][y][z])
+#define getChunk(world, x, y, z) (world->chunks[(((x) * world->size) + (y)) * world->size + (z)])
 
 #define BIN_3(_0, _1) _0, _0, _0, _0, _0, _1, _0, _1, _0, _0, _1, _1, _1, _0, _0, _1, _0, _1, _1, _1, _0, _1, _1, _1
 
@@ -50,16 +49,15 @@ typedef struct Chunk_S {
         Block blocks_lin[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
     };
     int x, y, z;
-    int flag;
     Mesh *mesh;
     char needsUpdate;
 } Chunk;
 
 typedef struct World_S {
-    union {
-        Chunk *chunks[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
-        Chunk *chunks_lin[WORLD_SIZE * WORLD_SIZE * WORLD_SIZE];
-    };
+    unsigned int size;
+    unsigned int num_chunks;
+
+    Chunk **chunks;
 } World;
 
 typedef struct Selection_S {
@@ -75,6 +73,7 @@ typedef struct Selection_S {
 // chunks
 
 Chunk * createChunk();
+void copyChunk(Chunk *dest, Chunk *src);
 void renderChunk(Chunk *chunk);
 void freeChunk(Chunk *chunk);
 
@@ -84,6 +83,13 @@ World * createWorld();
 void fillWorld(World *world);
 void drawWorld(World *world, mat4 viewMatrix, mat4 projectionMatrix);
 void freeWorld(World *world);
+
+// I/O
+
+World *readWorld(char *file_path);
+void writeWorld(World *world, char *file_path);
+char readChunk(Chunk *chunk, FILE *in);
+void writeChunk(Chunk *chunk, FILE *out);
 
 // blocks
 
@@ -97,6 +103,7 @@ void setBlock(Chunk *chunk, int x, int y, int z, Block block);
 
 // utils
 
+int countChunkSize(Chunk *chunk);
 int renderChunkToArrays(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfloat *colors, vec3 offset, float scale);
 int renderChunkWithMeshing(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfloat *colors, vec3 offset, float scale);
 

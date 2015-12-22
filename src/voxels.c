@@ -13,7 +13,7 @@
 
 #define BLOCK_MASK (CHUNK_SIZE - 1)
 
-static int countChunkSize(Chunk *chunk);
+// static int countChunkSize(Chunk *chunk);
 static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *indices);
 
 int useMeshing = 1;
@@ -43,11 +43,37 @@ Chunk * createChunk(int x, int y, int z) {
     chunk->x = x;
     chunk->y = y;
     chunk->z = z;
-    chunk->flag = 0;
 
     chunk->mesh = calloc(1, sizeof(Mesh));
 
     return chunk;
+}
+
+void copyChunk(Chunk *dest, Chunk *src) {
+    Block *srcBlock, *destBlock;
+
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_SIZE; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                srcBlock = getBlock(src, x, y, z);
+                destBlock = getBlock(dest, x, y, z);
+
+                destBlock->active = srcBlock->active;
+                destBlock->color = srcBlock->color;
+
+                if (srcBlock->logic) {
+                    destBlock->logic = calloc(1, sizeof(Logic));
+                    memcpy(destBlock->logic, srcBlock->logic, sizeof(Logic));
+                }else if (destBlock->data) {
+                    destBlock->data = createModel();
+                    copyChunk(destBlock->data->chunk, srcBlock->data->chunk);
+                    renderModel(destBlock->data);
+                }
+            }
+        }
+    }
+
+    renderChunk(dest);
 }
 
 void renderChunk(Chunk *chunk) {
@@ -90,7 +116,7 @@ void renderChunk(Chunk *chunk) {
     free(colors);
 }
 
-static int countChunkSize(Chunk *chunk) {
+int countChunkSize(Chunk *chunk) {
     int x, y, z;
     int count = 0;
     Block *block;
@@ -102,7 +128,7 @@ static int countChunkSize(Chunk *chunk) {
 
                 if (block->active) {
                     if (block->data)
-                        count += block->data->n_points;
+                        count += countChunkSize(block->data->chunk);
                     else
                         count += 12 * 3 * 3;
                 }
@@ -146,6 +172,11 @@ int renderChunkToArrays(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfloat
                 }
 
                 if (block->data) {
+                    if (block->data->chunk->needsUpdate) {
+                        renderModel(block->data);
+                        block->data->chunk->needsUpdate = 0;
+                    }
+
                     if (block->logic)
                         points_index += addRenderedModel(
                             block->data,
@@ -412,6 +443,11 @@ int renderChunkWithMeshing(Chunk *chunk, GLfloat *points, GLfloat *normals, GLfl
                     voxel1 = getBlock(chunk, pos[0], pos[1], pos[2]);
 
                     if (voxel1->active && voxel1->data) {
+                        if (voxel1->data->chunk->needsUpdate) {
+                            renderModel(voxel1->data);
+                            voxel1->data->chunk->needsUpdate = 0;
+                        }
+
                         if (voxel1->logic)
                             points_index += addRenderedModel(
                                     voxel1->data, &points[points_index], &normals[points_index], &colors[points_index], *voxel1->logic->rotationMatrix,
@@ -450,31 +486,197 @@ void freeChunk(Chunk *chunk) {
     free(chunk);
 }
 
-// World *readWorld(char *filename) {
-//     World *world = createWorld();
-//
-//
-// }
+typedef struct BlockData_S {
+    unsigned short int logic:1;
+    unsigned short int data:1;
 
-World * createWorld() {
+    unsigned short int logic_type:4;
+    unsigned short int logic_yaw:2;
+    unsigned short int logic_pitch:2;
+    unsigned short int logic_roll:2;
+
+    Color color;
+} BlockData;
+
+typedef struct RLE_BlockData_S {
+    unsigned int count;
+    BlockData data;
+} RLE_BlockData;
+
+void writeChunk(Chunk *chunk, FILE *out) {
+    RLE_BlockData buf = (RLE_BlockData){0};
+    BlockData data = (BlockData){0};
+    Block *block;
+
+    for (int i=0; i < CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE; i++) {
+        block = &chunk->blocks_lin[i];
+
+        data.logic = !!(block->logic);
+        data.data = !data.logic && block->data;
+        if (data.logic) {
+            data.logic_type = block->logic->type;
+            data.logic_roll = block->logic->roll;
+            data.logic_pitch = block->logic->pitch;
+            data.logic_yaw = block->logic->yaw;
+        }
+        data.color = block->color;
+
+        char equal = data.logic == buf.data.logic && data.data == !!buf.data.data &&
+                     (!data.logic || (data.logic_type == buf.data.logic_type && data.logic_roll == buf.data.logic_roll &&
+                       data.logic_pitch == buf.data.logic_pitch && data.logic_yaw == buf.data.logic_yaw)) &&
+                     data.color.all == buf.data.color.all && !data.data;
+
+        if (equal) {
+            buf.count++;
+        } else {
+            if (buf.count)
+                fwrite(&buf, sizeof(RLE_BlockData), 1, out);
+
+            buf.count = 1;
+            buf.data = data;
+
+            if (data.data) {
+                fwrite(&buf, sizeof(buf), 1, out);
+                buf.count = 0;
+                buf.data = (BlockData){0};
+                writeChunk(block->data->chunk, out);
+            }
+        }
+
+        data = (BlockData){0};
+    }
+
+    if (buf.count) fwrite(&buf, sizeof(buf), 1, out);
+}
+
+void writeWorld(World *world, char *file_path) {
+    FILE *out = fopen(file_path, "wb");
+
+    if (!out) {
+        fprintf(stderr, "Error writing %s: file not found\n", file_path);
+        return;
+    }
+
+    fwrite(&world->size, sizeof(world->size), 1, out);
+
+    for (int i = 0; i < world->num_chunks; i++) {
+        writeChunk(world->chunks[i], out);
+    }
+
+    fclose(out);
+}
+
+char readChunk(Chunk *chunk, FILE *in) {
+    RLE_BlockData buf;
+    BlockData data;
+    int count = 0, size, i = 0;
+    Block *block;
+
+    while (count < CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) {
+        size = fread(&buf, sizeof(buf), 1, in);
+
+        if (!size) { // file too short
+            fprintf(stderr, "Error reading world file");
+            if (feof(in)) fputs("; file too short", stderr);
+            else if (ferror(in)) fputs("; an error occured", stderr);
+            fputs("\n", stderr);
+            return 0;
+        }
+
+        // printf("read %d blocks\n", buf.count);
+
+        count += buf.count;
+        data = buf.data;
+
+        while (buf.count > 0) {
+            block = &chunk->blocks_lin[i];
+
+            if (data.logic) {
+                block->logic = calloc(1, sizeof(Logic));
+
+                block->logic->type = data.logic_type;
+                block->logic->roll = data.logic_roll;
+                block->logic->pitch = data.logic_pitch;
+                block->logic->yaw = data.logic_yaw;
+
+                updateLogicModel(block);
+            }
+
+            if (data.data) {
+                block->data = createModel();
+                block->data->chunk = createChunk(0, 0, 0);
+                block->active = 1;
+                if (!readChunk(block->data->chunk, in))
+                    return 0;
+                renderModel(block->data);
+            }
+
+            block->color = data.color;
+            if (data.color.all) {
+                block->active = 1;
+            }
+
+            i++;
+            buf.count--;
+        }
+    }
+
+    renderChunk(chunk);
+
+    return 1;
+}
+
+World *readWorld(char *file_path) {
+    FILE *in = fopen(file_path, "rb");
+
+    if (!in) {
+        fprintf(stderr, "Error reading %s: file not found\n", file_path);
+        return NULL;
+    }
+
+    unsigned int size;
+
+    fread(&size, sizeof(size), 1, in);
+
+    World *world = createWorld(size);
+
+    for (int i = 0; i < world->num_chunks; i++) {
+        if (!readChunk(world->chunks[i], in)) {
+            freeWorld(world);
+            fclose(in);
+            return NULL;
+        }
+    }
+
+    fclose(in);
+
+    return world;
+}
+
+World * createWorld(unsigned int size) {
     World *world = malloc(sizeof(World));
+
+    world->size = size;
+    world->num_chunks = size * size * size;
+
+    world->chunks = calloc(world->num_chunks, sizeof(Chunk*));
 
     int x, y, z;
 
-    for (x = 0; x < WORLD_SIZE; x++) {
-        for (y = 0; y < WORLD_SIZE; y++) {
-            for (z = 0; z < WORLD_SIZE; z++) {
-                world->chunks[x][y][z] = createChunk(x, y, z);
+    for (x = 0; x < world->size; x++) {
+        for (y = 0; y < world->size; y++) {
+            for (z = 0; z < world->size; z++) {
+                getChunk(world, x, y, z) = createChunk(x, y, z);
             }
         }
     }
 
-    #define WORLD_BLOCK_WIDTH WORLD_SIZE * CHUNK_SIZE
+    unsigned int world_block_width = world->size * CHUNK_SIZE;
 
     // link neighbors in the world
-    for (x = 0; x < WORLD_BLOCK_WIDTH; x++) {
-        for (y = 0; y < WORLD_BLOCK_WIDTH; y++) {
-            for (z = 0; z < WORLD_BLOCK_WIDTH; z++) {
+    for (x = 0; x < world_block_width; x++) {
+        for (y = 0; y < world_block_width; y++) {
+            for (z = 0; z < world_block_width; z++) {
                 Block *block = worldBlock(world, x, y, z);
 
                 block->nb_pos_x = worldBlock(world, x+1, y, z);
@@ -487,64 +689,56 @@ World * createWorld() {
         }
     }
 
-    #undef WORLD_BLOCK_WIDTH
-
     return world;
 }
 
 void fillWorld(World *world) {
     int cx, cy, cz, bx, by, bz;
 
-    for (cx = 0; cx < WORLD_SIZE; cx++) {
-        for (cy = 0; cy < WORLD_SIZE; cy++) {
-            for (cz = 0; cz < WORLD_SIZE; cz++) {
+    for (cx = 0; cx < world->size; cx++) {
+        for (cy = 0; cy < world->size; cy++) {
+            for (cz = 0; cz < world->size; cz++) {
                 for (bx = 0; bx < CHUNK_SIZE; bx++) {
                     for (by = 0; by < CHUNK_SIZE; by++) {
                         for (bz = 0; bz < CHUNK_SIZE; bz++) {
                             int m = (bx + by + bz) % 2 ? -1 : (-1 << 6);
                             if (by == 0 && cy == 0) {
-                                setBlock(world->chunks[cx][cy][cz], bx, by, bz,
+                                setBlock(getChunk(world, cx, cy, cz), bx, by, bz,
                                     (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
                             } else if (((bx == 0 && cx == 0) || (bz == 0 && cz == 0)) && by == 1 && cy == 0) {
-                                setBlock(world->chunks[cx][cy][cz], bx, by, bz,
+                                setBlock(getChunk(world, cx, cy, cz), bx, by, bz,
                                     (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
                             }
                         }
                     }
                 }
 
-                renderChunk(world->chunks[cx][cy][cz]);
+                renderChunk(getChunk(world, cx, cy, cz));
             }
         }
     }
 }
 
 void drawWorld(World *world, mat4 viewMatrix, mat4 projectionMatrix) {
-    int x, y, z;
+    int i;
     Chunk *chunk;
 
-    for (x = 0; x < WORLD_SIZE; x++) {
-        for (y = 0; y < WORLD_SIZE; y++) {
-            for (z = 0; z < WORLD_SIZE; z++) {
-                chunk = world->chunks[x][y][z];
-                if (chunk->mesh->size != 0 && isVisible(chunk, viewMatrix, projectionMatrix)) {
-                    drawMesh(chunk->mesh);
-                }
-            }
+    for (i = 0; i < world->num_chunks; i++) {
+        chunk = world->chunks[i];
+        if (chunk->mesh->size != 0 && isVisible(chunk, viewMatrix, projectionMatrix)) {
+            drawMesh(chunk->mesh);
         }
     }
 }
 
 void freeWorld(World *world) {
-    int x, y, z;
+    int i;
 
-    for (x = 0; x < WORLD_SIZE; x++) {
-        for (y = 0; y < WORLD_SIZE; y++) {
-            for (z = 0; z < WORLD_SIZE; z++) {
-                freeChunk(world->chunks[x][y][z]);
-            }
-        }
+    for (i = 0; i < world->num_chunks; i++) {
+        freeChunk(world->chunks[i]);
     }
+
+    free(world->chunks);
 
     free(world);
 }
@@ -727,8 +921,8 @@ int solidBlockInArea(World *world, int minx, int miny, int minz, int maxx, int m
                 if (bx >= 0 && by >= 0 && bz >= 0 &&
                     bx < CHUNK_SIZE && by < CHUNK_SIZE && bz < CHUNK_SIZE &&
                     cx >= 0 && cy >= 0 && cz >= 0 &&
-                    cx < WORLD_SIZE && cy < WORLD_SIZE && cz < WORLD_SIZE &&
-                    getBlock(world->chunks[cx][cy][cz], bx, by, bz)->active)
+                    cx < world->size && cy < world->size && cz < world->size &&
+                    getBlock(getChunk(world, cx, cy, cz), bx, by, bz)->active)
                     return 1;
             }
         }
@@ -778,7 +972,7 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
     if (dx == 0 && dy == 0 && dz == 0) return ret;
 
     while (1) {
-        if (!(x < 0 || y < 0 || z < 0 || x >= CHUNK_SIZE * WORLD_SIZE || y >= CHUNK_SIZE * WORLD_SIZE || z >= CHUNK_SIZE * WORLD_SIZE)) {
+        if (!(x < 0 || y < 0 || z < 0 || x >= CHUNK_SIZE * world->size || y >= CHUNK_SIZE * world->size || z >= CHUNK_SIZE * world->size)) {
             ret.selected_chunk_x = x >> LOG_CHUNK_SIZE;
             ret.selected_chunk_y = y >> LOG_CHUNK_SIZE;
             ret.selected_chunk_z = z >> LOG_CHUNK_SIZE;
@@ -787,14 +981,14 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
             ret.selected_block_z = z & BLOCK_MASK;
 
             // now check if the block is solid
-            if (getBlock(world->chunks[ret.selected_chunk_x][ret.selected_chunk_y][ret.selected_chunk_z],
+            if (getBlock(getChunk(world, ret.selected_chunk_x, ret.selected_chunk_y, ret.selected_chunk_z),
                          ret.selected_block_x, ret.selected_block_y, ret.selected_block_z)->active) {
                 ret.selected_active = 1;
 
                 if (px >= 0 && py >= 0 && pz >= 0 &&
-                    px < CHUNK_SIZE * WORLD_SIZE &&
-                    py < CHUNK_SIZE * WORLD_SIZE &&
-                    pz < CHUNK_SIZE * WORLD_SIZE) {
+                    px < CHUNK_SIZE * world->size &&
+                    py < CHUNK_SIZE * world->size &&
+                    pz < CHUNK_SIZE * world->size) {
 
                     ret.previous_chunk_x = px >> LOG_CHUNK_SIZE;
                     ret.previous_chunk_y = py >> LOG_CHUNK_SIZE;
@@ -840,18 +1034,18 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
 }
 
 Block* selectedBlock(World *world, Selection* selection) {
-    return &world->chunks[selection->selected_chunk_x][selection->selected_chunk_y][selection->selected_chunk_z]
-                 ->blocks[selection->selected_block_x][selection->selected_block_y][selection->selected_block_z];
+    return getBlock(getChunk(world, selection->selected_chunk_x, selection->selected_chunk_y, selection->selected_chunk_z),
+                    selection->selected_block_x, selection->selected_block_y, selection->selected_block_z);
 }
 
 Block* worldBlock(World *world, int x, int y, int z) {
-    #define WORLD_BLOCK_WIDTH WORLD_SIZE * CHUNK_SIZE
-    if (x < 0 || y < 0 || z < 0 || x >= WORLD_BLOCK_WIDTH || y >= WORLD_BLOCK_WIDTH || z >= WORLD_BLOCK_WIDTH)
+    unsigned int world_block_width = world->size * CHUNK_SIZE;
+
+    if (x < 0 || y < 0 || z < 0 || x >= world_block_width || y >= world_block_width || z >= world_block_width)
         return NULL;
 
-    return &world->chunks[x >> LOG_CHUNK_SIZE][y >> LOG_CHUNK_SIZE][z >> LOG_CHUNK_SIZE]
-                 ->blocks[x & BLOCK_MASK][y & BLOCK_MASK][z & BLOCK_MASK];
-    #undef WORLD_BLOCK_WIDTH
+    return getBlock(getChunk(world, x >> LOG_CHUNK_SIZE, y >> LOG_CHUNK_SIZE, z >> LOG_CHUNK_SIZE),
+                    x & BLOCK_MASK, y & BLOCK_MASK, z & BLOCK_MASK);
 }
 
 static void getFaceData(const GLfloat *dest, const GLfloat *src, const GLuint *indices) {

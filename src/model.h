@@ -7,11 +7,6 @@
 #include "color.h"
 
 typedef struct Model_S {
-    union {
-        Color blocks[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
-        Color blocks3d[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
-    };
-
     GLfloat *points, *normals, *colors;
     int n_points;
 
@@ -25,6 +20,5 @@ void renderModel(Model *model);
 int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *colors, mat4 rotate, vec3 offset, float scale);
 void insertModel(Model *model, Block *block);
 void freeModel(Model *model);
-void copyModel(Model *dest, Model *src);
 
 #endif

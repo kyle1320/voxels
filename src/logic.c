@@ -75,14 +75,45 @@ void initLogicModels() {
     char *fname = malloc(40);
     Model *model;
 
+    World *world = readWorld("worlds/gates");
+
     for (int i=0; i < NUM_GATES; i++) {
         for (int j=0; j < 64; j++) {
-            sprintf(fname, "models/%d/%d%d%d%d%d%d", i, (j>>5)&1, (j>>4)&1, (j>>3)&1, (j>>2)&1, (j>>1)&1, j&1);
             model = createModel();
-            readModel(model, fname);
+            model->chunk = world->chunks[(i * 64) + j];
+            renderModel(model);
+
             logic_models[i][j] = model;
         }
     }
+
+    free(world->chunks);
+    free(world);
+
+    // // World *world = createWorld(10);
+    //
+    // for (int i=0; i < NUM_GATES; i++) {
+    //     for (int j=0; j < 64; j++) {
+    //         sprintf(fname, "models/%d/%d%d%d%d%d%d", i, (j>>5)&1, (j>>4)&1, (j>>3)&1, (j>>2)&1, (j>>1)&1, j&1);
+    //         model = createModel();
+    //         readModel(model, fname);
+    //
+    //         // world->chunks[(i * 64) + j] = model->chunk;
+    //
+    //         // char *fname2 = malloc(40);
+    //         // sprintf(fname2, "chunks/%d/%d%d%d%d%d%d", i, (j>>5)&1, (j>>4)&1, (j>>3)&1, (j>>2)&1, (j>>1)&1, j&1);
+    //         // FILE *out = fopen(fname2, "wb");
+    //         //
+    //         // writeChunk(model->chunk, out);
+    //         //
+    //         // fclose(out);
+    //         // free(fname2);
+    //
+    //         logic_models[i][j] = model;
+    //     }
+    // }
+    //
+    // // writeWorld(world, "worlds/logic_models");
 
     for (int r = 0; r < 4; r++) {
         for (int p = 0; p < 4; p++) {
@@ -181,16 +212,79 @@ void autoOrient(Block *block) {
     }
 }
 
-void logicLoop(World *world) {
-    unsigned int i, j, type, input, output;
-    Chunk *chunk;
+void updateLogicModel(Block *block) {
+    if (block->logic) {
+        unsigned int input = rotate_inputs(block->logic->input.all, block->logic->roll, block->logic->pitch, block->logic->yaw);
+        block->data = logic_models[block->logic->type][input];
+        block->logic->rotationMatrix = &rotation_matrices[block->logic->roll][block->logic->pitch][block->logic->yaw];
+    }
+}
+
+#define BLOCKS_PER_CHUNK CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE
+
+static void updateChunkLogic(Chunk *chunk, Block **logicBlocks, int *count) {
+    int i, j, k, type, input, output;
     Block *block;
 
-    #define NUM_CHUNKS WORLD_SIZE * WORLD_SIZE * WORLD_SIZE
-    #define BLOCKS_PER_CHUNK CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE
-    #define NUM_BLOCKS NUM_CHUNKS * BLOCKS_PER_CHUNK
+    // don't bother looping if there aren't any blocks.
+    if (chunk->mesh->size) {
+        for (i = 0; i < BLOCKS_PER_CHUNK; i++) {
+            block = &chunk->blocks_lin[i];
 
-    Block **logicBlocks = malloc(NUM_BLOCKS * sizeof(Block*));
+            // calculate logic
+            if (block->logic) {
+                logicBlocks[(*count)++] = block;
+
+                type = block->logic->type & 0xF;
+
+                input = rotate_inputs(block->logic->input.all, block->logic->roll, block->logic->pitch, block->logic->yaw);
+                output = rotate_outputs(outputs[type][input], block->logic->roll, block->logic->pitch, block->logic->yaw);
+
+                block->logic->output.all = output;
+                if (block->data != (block->data = logic_models[type][input]) |
+                    block->logic->rotationMatrix != (block->logic->rotationMatrix = &rotation_matrices[block->logic->roll][block->logic->pitch][block->logic->yaw])) {
+                    chunk->needsUpdate = 1;
+                }
+            }
+            // else if (block->data){
+            //     static Block **modelLogicBlocks = NULL;
+            //     int count2;
+            //
+            //     if (!modelLogicBlocks) modelLogicBlocks = malloc(BLOCKS_PER_CHUNK * sizeof(Block*));
+            //
+            //     count2 = 0;
+            //     updateChunkLogic(block->data->chunk, modelLogicBlocks, &count2);
+            //     for (k = 0; k < count2; k++) {
+            //         block = modelLogicBlocks[k];
+            //
+            //         if (block->logic) {
+            //             block->logic->input.pos_x = (block->nb_pos_x && block->nb_pos_x->logic && block->nb_pos_x->logic->output.neg_x);
+            //             block->logic->input.neg_x = (block->nb_neg_x && block->nb_neg_x->logic && block->nb_neg_x->logic->output.pos_x);
+            //             block->logic->input.pos_y = (block->nb_pos_y && block->nb_pos_y->logic && block->nb_pos_y->logic->output.neg_y);
+            //             block->logic->input.neg_y = (block->nb_neg_y && block->nb_neg_y->logic && block->nb_neg_y->logic->output.pos_y);
+            //             block->logic->input.pos_z = (block->nb_pos_z && block->nb_pos_z->logic && block->nb_pos_z->logic->output.neg_z);
+            //             block->logic->input.neg_z = (block->nb_neg_z && block->nb_neg_z->logic && block->nb_neg_z->logic->output.pos_z);
+            //         }
+            //     }
+            //
+            //     if (block->data->chunk->needsUpdate) {
+            //         // renderModel(block->data);
+            //         // block->data->chunk->needsUpdate = 0;
+            //         chunk->needsUpdate = 1;
+            //     }
+            // }
+        }
+    }
+}
+
+void logicLoop(World *world) {
+    unsigned int i;
+    Block *block;
+
+    unsigned int num_chunks = world->size * world->size * world->size;
+    unsigned int num_blocks = num_chunks * BLOCKS_PER_CHUNK;
+
+    Block **logicBlocks = malloc(num_blocks * sizeof(Block*));
     int count;
 
     while (!quitThread) {
@@ -198,31 +292,8 @@ void logicLoop(World *world) {
 
         count = 0;
 
-        for (i = 0; i < NUM_CHUNKS; i++) {
-            chunk = world->chunks_lin[i];
-
-            // don't bother looping if there aren't any blocks.
-            if (chunk->mesh->size) {
-                for (j = 0; j < BLOCKS_PER_CHUNK; j++) {
-                    block = &chunk->blocks_lin[j];
-
-                    // calculate logic
-                    if (block->logic) {
-                        logicBlocks[count++] = block;
-
-                        type = block->logic->type & 0xF;
-
-                        input = rotate_inputs(block->logic->input.all, block->logic->roll, block->logic->pitch, block->logic->yaw);
-                        output = rotate_outputs(outputs[type][input], block->logic->roll, block->logic->pitch, block->logic->yaw);
-
-                        block->logic->output.all = output;
-                        if (block->data != (block->data = logic_models[type][input]) |
-                            block->logic->rotationMatrix != (block->logic->rotationMatrix = &rotation_matrices[block->logic->roll][block->logic->pitch][block->logic->yaw])) {
-                            chunk->needsUpdate = 1;
-                        }
-                    }
-                }
-            }
+        for (i = 0; i < num_chunks; i++) {
+            updateChunkLogic(world->chunks[i], logicBlocks, &count);
         }
 
         // advance logic (send updated outputs)
@@ -242,9 +313,7 @@ void logicLoop(World *world) {
 
     free(logicBlocks);
 
-    #undef NUM_CHUNKS
     #undef BLOCKS_PER_CHUNK
-    #undef NUM_BLOCKS
 }
 
 void runLogicThread(World *world) {

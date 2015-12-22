@@ -27,6 +27,7 @@ typedef struct Logic_S {
 
 void initLogicModels();
 void freeLogicModels();
+void updateLogicModel(Block *block);
 void autoOrient(Block *block);
 void runLogicThread(World *world);
 void stopLogicThread();
