@@ -22,8 +22,8 @@ Features include:
   * Frustum culling
   * Triangle meshing
 
-<img src="http://i.imgur.com/iGvxO6X.png" alt="A 4-bit register made in the game" height="300px" style="padding-right: 50px";>
-<img src="http://i.imgur.com/Hso8R2q.png" alt="A 8x1 multiplexer made in the game" height="300px">
+<img src="http://i.imgur.com/QrhrGA1.png" alt="A 5-to-32 decoder made in the game" height="300px">
+<img src="http://i.imgur.com/iGvxO6X.png" alt="A 4-bit register made in the game" height="300px">
 
 For now, the world is finite.
 
