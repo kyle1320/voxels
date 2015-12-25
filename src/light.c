@@ -42,7 +42,7 @@ void freeLight(Light *light) {
 }
 
 static Mesh *makeLightMesh(float size, vec3 color) {
-    Mesh *mesh = malloc(sizeof(Mesh));
+    Mesh *mesh = createMesh();
     float min = -size / 2;
 
     makeBox(mesh, min, min, min, size, size, size, color);
