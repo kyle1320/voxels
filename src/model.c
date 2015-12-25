@@ -115,7 +115,7 @@ int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *c
 void insertModel(Model *model, Block *block) {
     block->active = 1;
     block->color.all = 0;
-    block->data = model;
+    block->data = copyModel(model);
     block->logic = NULL;
 }
 
@@ -128,4 +128,14 @@ void freeModel(Model *model) {
     free(model->colors);
 
     free(model);
+}
+
+Model *copyModel(Model *model) {
+    Model *ret = createModel();
+
+    copyChunk(ret->chunk, model->chunk);
+
+    renderModel(ret);
+
+    return ret;
 }

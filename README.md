@@ -14,7 +14,7 @@ Features include:
   * Basic physics engine
   * Place / destroy blocks of a chosen color
   * "Models", which are 16x16x16 chunks that fit in the space of a single normal block
-  * Models can be saved to, and loaded from, files
+  * Saving and loading of worlds / chunks
   * A wiring system including basic logic gates
   * Ambient, diffuse, and specular light
   * Point light shadows

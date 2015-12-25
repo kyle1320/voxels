@@ -5,6 +5,7 @@
 #include "mesh.h"
 #include "color.h"
 #include "matrix.h"
+#include "logic.h"
 
 extern int frame_buffer_width;
 extern int frame_buffer_height;
@@ -116,6 +117,46 @@ void makeColorChooser(Mesh *mesh, int chunksx, int chunksy, int chunkwidth, int 
     free(indices);
 }
 
+void makeBlockChooser(Mesh *mesh, int height, int padding, int border) {
+    #define NUM_QUADS (NUM_GATES * CHUNK_SIZE * CHUNK_SIZE)
+    #define NUM_POINTS (3 * 4 * NUM_QUADS)
+    #define NUM_INDICES (3 * 3 * 2 * NUM_QUADS)
+
+    // GLfloat *normals = calloc(NUM_POINTS, sizeof(GLfloat));
+    //
+    // GLfloat *points = malloc(NUM_POINTS * sizeof(GLfloat));
+    // GLfloat *colors = malloc(NUM_POINTS * sizeof(GLfloat));
+    // GLfloat *indices = malloc(NUM_INDICES * sizeof(GLfloat));
+    //
+    // unsigned int points_index = 0, indices_index = 0, i, x, y, z;
+    // Chunk *chunk;
+    // Block *block;
+    // Color color;
+    //
+    // for (i = 0; i < NUM_GATES; i++) {
+    //     for (x = 0; x < CHUNK_SIZE; x++) {
+    //         for (z = 0; z < CHUNK_SIZE; z++) {
+    //             chunk = getLogicModel(i, 0);
+    //
+    //             for (y = CHUNK_SIZE-1; y > 0; y--) {
+    //                 block = getBlock(chunk, x, y, z);
+    //
+    //                 if (block->active) {
+    //                     color = block->color;
+    //                     break;
+    //                 }
+    //             }
+    //
+    //             // draw the block
+    //         }
+    //     }
+    // }
+
+    #undef NUM_QUADS
+    #undef NUM_POINTS
+    #undef NUM_INDICES
+}
+
 void makeCubeMapLayout(Mesh *mesh, int width) {
     float sizex = PIXEL_X(width);
     float sizey = PIXEL_Y(width);
@@ -220,6 +261,14 @@ void makeSkybox(Mesh *mesh) {
               sizeof(colors), 0,
               sizeof(indices),
               sizeof(indices) / sizeof(GLuint));
+}
+
+Mesh *createMesh() {
+    Mesh *mesh = calloc(1, sizeof(Mesh));
+
+    // identity_m4(mesh->modelMatrix);
+
+    return mesh;
 }
 
 void freeMesh(Mesh *mesh) {

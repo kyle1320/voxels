@@ -20,5 +20,6 @@ void renderModel(Model *model);
 int addRenderedModel(Model *model, GLfloat *points, GLfloat *normals, GLfloat *colors, mat4 rotate, vec3 offset, float scale);
 void insertModel(Model *model, Block *block);
 void freeModel(Model *model);
+Model *copyModel(Model *model);
 
 #endif

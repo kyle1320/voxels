@@ -39,12 +39,13 @@ void rect(Mesh *mesh, float minx, float miny, float maxx, float maxy, float z, v
 void makeCrosshair(Mesh *mesh, int width, int height, int border);
 void makeSelectionBox(Mesh *mesh, int boxsize, int boxborder, int outerborder, int innerborder);
 void makeColorChooser(Mesh *mesh, int chunksx, int chunksy, int chunkwidth, int border);
+void makeBlockChooser(Mesh *mesh, int height, int padding, int border);
 void makeCubeMapLayout(Mesh *mesh, int width);
 void makeSkybox(Mesh *mesh);
 void makeBox(Mesh *mesh, float minx, float miny, float minz, float width, float height, float length, vec3 color);
 
+Mesh *createMesh();
 void freeMesh(Mesh *mesh);
-
 void buildMesh(Mesh *mesh, GLfloat *points, GLfloat *normals, GLfloat *colors, GLfloat *texuvs, GLuint *indices,
                int spoints, int snormals, int scolors, int stexuvs, int sindices, int nindices);
 

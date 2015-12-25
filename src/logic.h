@@ -2,8 +2,9 @@
 #define LOGIC_H_
 
 #include "voxels.h"
+#include "model.h"
 
-#define NUM_GATES 13
+#define NUM_GATES 14
 
 typedef struct Logic_S {
     unsigned int type:4;
@@ -26,6 +27,7 @@ typedef struct Logic_S {
 } Logic;
 
 void initLogicModels();
+Model *getLogicModel(int type, int inputs);
 void freeLogicModels();
 void updateLogicModel(Block *block);
 void autoOrient(Block *block);

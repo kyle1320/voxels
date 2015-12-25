@@ -44,7 +44,7 @@ Chunk * createChunk(int x, int y, int z) {
     chunk->y = y;
     chunk->z = z;
 
-    chunk->mesh = calloc(1, sizeof(Mesh));
+    chunk->mesh = createMesh();
 
     return chunk;
 }
@@ -61,10 +61,20 @@ void copyChunk(Chunk *dest, Chunk *src) {
                 destBlock->active = srcBlock->active;
                 destBlock->color = srcBlock->color;
 
+                if (destBlock->logic) {
+                    free(destBlock->logic);
+                    destBlock->logic = NULL;
+                }
+
+                if (destBlock->data) {
+                    destBlock->data = NULL;
+                }
+
                 if (srcBlock->logic) {
                     destBlock->logic = calloc(1, sizeof(Logic));
                     memcpy(destBlock->logic, srcBlock->logic, sizeof(Logic));
-                }else if (destBlock->data) {
+                    updateLogicModel(destBlock);
+                } else if (srcBlock->data) {
                     destBlock->data = createModel();
                     copyChunk(destBlock->data->chunk, srcBlock->data->chunk);
                     renderModel(destBlock->data);
@@ -129,6 +139,9 @@ int countChunkSize(Chunk *chunk) {
                 if (block->active) {
                     if (block->data)
                         count += countChunkSize(block->data->chunk);
+                    // due to some multithreading issues, we may have to over-report
+                    else if (block->logic)
+                        count += countChunkSize(getLogicModel(block->logic->type, 0)->chunk);
                     else
                         count += 12 * 3 * 3;
                 }

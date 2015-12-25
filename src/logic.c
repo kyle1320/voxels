@@ -55,15 +55,18 @@ static unsigned char outputs[NUM_GATES][64] = {
     {0x00,0x00,0x00,0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x01,0x01,0x01,}, // gate (10) - xor
     {0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,}, // gate (11) - constant 1
     {0x00,0x20,0x00,0x20,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x00,0x20,0x00,0x20,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,0x01,0x21,}, // wire (12) - bidirectional connect-3
+    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,}, // wire (13) - color output
 };
 
 static unsigned char input_faces[NUM_GATES] = {
-    0x09, 0x2D, 0x2D, 0x29, 0x28, 0x2D, 0x08, 0x08, 0x2C, 0x2C, 0x2C, 0x00, 0x29
+    0x09, 0x2D, 0x2D, 0x29, 0x28, 0x2D, 0x08, 0x08, 0x2C, 0x2C, 0x2C, 0x00, 0x29, 0x2C
 };
 
 static unsigned char output_faces[NUM_GATES] = {
-    0x09, 0x2D, 0x2D, 0x29, 0x28, 0x2D, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x21
+    0x09, 0x2D, 0x2D, 0x29, 0x28, 0x2D, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x21, 0x00
 };
+
+int showLogic = 1;
 
 static Model *logic_models[NUM_GATES][64];
 static mat4 rotation_matrices[4][4][4];
@@ -77,15 +80,72 @@ void initLogicModels() {
 
     World *world = readWorld("worlds/gates");
 
-    for (int i=0; i < NUM_GATES; i++) {
-        for (int j=0; j < 64; j++) {
+    // int i, j, x, y, z, r, g, b, p;
+    int i, j, r, p, y;
+
+    for (i=0; i < NUM_GATES; i++) {
+        for (j=0; j < 64; j++) {
             model = createModel();
             model->chunk = world->chunks[(i * 64) + j];
+            // for (x=0; x < CHUNK_SIZE; x++) {
+            //     for (y=0; y < CHUNK_SIZE; y++) {
+            //         for (z=0; z < CHUNK_SIZE; z++) {
+            //             Block *blk = getBlock(model->chunk, x, y, z);
+            //             if (blk->color.r == 0x42 && blk->color.g == 0xFF && blk->color.b == 0x09)
+            //                 blk->color.all = 0xFF00FF00;
+            //         }
+            //     }
+            // }
             renderModel(model);
 
             logic_models[i][j] = model;
         }
     }
+
+    // Block block;
+    //
+    // for (i=0; i < 64; i++) {
+    //     model = createModel();
+    //
+    //     r = (i >> 2) & 1;
+    //     g = (i >> 3) & 1;
+    //     b = (i >> 5) & 1;
+    //
+    //     for (x = 0; x < 1; x++) {
+    //         block = (Block){1, (Color){{255*(!r), 255*r, 0, 255}}, NULL, NULL};
+    //         setBlock(model->chunk, x, 7, 7, block);
+    //         setBlock(model->chunk, x, 7, 8, block);
+    //         setBlock(model->chunk, x, 8, 7, block);
+    //         setBlock(model->chunk, x, 8, 8, block);
+    //
+    //         block = (Block){1, (Color){{255*(!g), 255*g, 0, 255}}, NULL, NULL};
+    //         setBlock(model->chunk, 7, 7, (CHUNK_SIZE-x-1), block);
+    //         setBlock(model->chunk, 7, 8, (CHUNK_SIZE-x-1), block);
+    //         setBlock(model->chunk, 8, 7, (CHUNK_SIZE-x-1), block);
+    //         setBlock(model->chunk, 8, 8, (CHUNK_SIZE-x-1), block);
+    //
+    //         block = (Block){1, (Color){{255*(!b), 255*b, 0, 255}}, NULL, NULL};
+    //         setBlock(model->chunk, (CHUNK_SIZE-x-1), 7, 7, block);
+    //         setBlock(model->chunk, (CHUNK_SIZE-x-1), 7, 8, block);
+    //         setBlock(model->chunk, (CHUNK_SIZE-x-1), 8, 7, block);
+    //         setBlock(model->chunk, (CHUNK_SIZE-x-1), 8, 8, block);
+    //     }
+    //
+    //     for (x=1; x < CHUNK_SIZE-1; x++) {
+    //         for (y=1; y < CHUNK_SIZE-1; y++) {
+    //             for (z=1; z < CHUNK_SIZE-1; z++) {
+    //                 block = (Block){1, (Color){{255*r, 255*g, 255*b, 255}}, NULL, NULL};
+    //                 setBlock(model->chunk, x, y, z, block);
+    //             }
+    //         }
+    //     }
+    //
+    //     world->chunks[((NUM_GATES - 1) * 64) + i] = model->chunk;
+    //
+    //     // freeModel(model);
+    // }
+    //
+    // writeWorld(world, "worlds/gates");
 
     free(world->chunks);
     free(world);
@@ -115,9 +175,9 @@ void initLogicModels() {
     //
     // // writeWorld(world, "worlds/logic_models");
 
-    for (int r = 0; r < 4; r++) {
-        for (int p = 0; p < 4; p++) {
-            for (int y = 0; y < 4; y++) {
+    for (r = 0; r < 4; r++) {
+        for (p = 0; p < 4; p++) {
+            for (y = 0; y < 4; y++) {
                 rotation_Z_m4(rotation_matrices[r][p][y], (r * 1.5707963268));
                 rotate_X_m4(rotation_matrices[r][p][y], (p * 1.5707963268));
                 rotate_Y_m4(rotation_matrices[r][p][y], (y * 1.5707963268));
@@ -126,6 +186,10 @@ void initLogicModels() {
     }
 
     free(fname);
+}
+
+Model *getLogicModel(int type, int inputs) {
+    return logic_models[type][inputs];
 }
 
 void freeLogicModels() {
@@ -222,7 +286,7 @@ void updateLogicModel(Block *block) {
 
 #define BLOCKS_PER_CHUNK CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE
 
-static void updateChunkLogic(Chunk *chunk, Block **logicBlocks, int *count) {
+static void updateChunkLogic(Chunk *chunk, Block ***logicBlocks, int *count, int *max_count) {
     int i, j, k, type, input, output;
     Block *block;
 
@@ -233,7 +297,14 @@ static void updateChunkLogic(Chunk *chunk, Block **logicBlocks, int *count) {
 
             // calculate logic
             if (block->logic) {
-                logicBlocks[(*count)++] = block;
+
+                // we only allocate as much space as we need.
+                if (*count >= *max_count) {
+                    *max_count = *count + BLOCKS_PER_CHUNK;
+                    *logicBlocks = realloc(*logicBlocks, *max_count * sizeof(Block*));
+                }
+
+                (*logicBlocks)[(*count)++] = block;
 
                 type = block->logic->type & 0xF;
 
@@ -241,37 +312,43 @@ static void updateChunkLogic(Chunk *chunk, Block **logicBlocks, int *count) {
                 output = rotate_outputs(outputs[type][input], block->logic->roll, block->logic->pitch, block->logic->yaw);
 
                 block->logic->output.all = output;
-                if (block->data != (block->data = logic_models[type][input]) |
-                    block->logic->rotationMatrix != (block->logic->rotationMatrix = &rotation_matrices[block->logic->roll][block->logic->pitch][block->logic->yaw])) {
+                if (showLogic || type == 13) {
+                    if (block->data != (block->data = logic_models[type][input]))
+                        chunk->needsUpdate = 1;
+                }
+                if (block->logic->rotationMatrix != (block->logic->rotationMatrix = &rotation_matrices[block->logic->roll][block->logic->pitch][block->logic->yaw])) {
                     chunk->needsUpdate = 1;
                 }
             }
-            // else if (block->data){
-            //     static Block **modelLogicBlocks = NULL;
-            //     int count2;
-            //
-            //     if (!modelLogicBlocks) modelLogicBlocks = malloc(BLOCKS_PER_CHUNK * sizeof(Block*));
-            //
-            //     count2 = 0;
-            //     updateChunkLogic(block->data->chunk, modelLogicBlocks, &count2);
-            //     for (k = 0; k < count2; k++) {
-            //         block = modelLogicBlocks[k];
-            //
-            //         if (block->logic) {
-            //             block->logic->input.pos_x = (block->nb_pos_x && block->nb_pos_x->logic && block->nb_pos_x->logic->output.neg_x);
-            //             block->logic->input.neg_x = (block->nb_neg_x && block->nb_neg_x->logic && block->nb_neg_x->logic->output.pos_x);
-            //             block->logic->input.pos_y = (block->nb_pos_y && block->nb_pos_y->logic && block->nb_pos_y->logic->output.neg_y);
-            //             block->logic->input.neg_y = (block->nb_neg_y && block->nb_neg_y->logic && block->nb_neg_y->logic->output.pos_y);
-            //             block->logic->input.pos_z = (block->nb_pos_z && block->nb_pos_z->logic && block->nb_pos_z->logic->output.neg_z);
-            //             block->logic->input.neg_z = (block->nb_neg_z && block->nb_neg_z->logic && block->nb_neg_z->logic->output.pos_z);
-            //         }
-            //     }
-            //
-            //     if (block->data->chunk->needsUpdate) {
-            //         // renderModel(block->data);
-            //         // block->data->chunk->needsUpdate = 0;
+            // else if (block->data) {
+            //     // int x, y, z;
+            //     // if (block->nb_pos_x && block->nb_pos_x->data)
+            //     //     for (y = 0; y < CHUNK_SIZE; y++)
+            //     //         for (z = 0; z < CHUNK_SIZE; z++)
+            //     //             getBlock(block->data->chunk, CHUNK_SIZE-1, y, z)->nb_pos_x = getBlock(block->nb_pos_x->data->chunk, 0, y, z);
+            //     // if (block->nb_neg_x && block->nb_neg_x->data)
+            //     //     for (y = 0; y < CHUNK_SIZE; y++)
+            //     //         for (z = 0; z < CHUNK_SIZE; z++)
+            //     //             getBlock(block->data->chunk, 0, y, z)->nb_neg_x = getBlock(block->nb_neg_x->data->chunk, CHUNK_SIZE-1, y, z);
+            //     // if (block->nb_pos_y && block->nb_pos_y->data)
+            //     //     for (x = 0; x < CHUNK_SIZE; x++)
+            //     //         for (z = 0; z < CHUNK_SIZE; z++)
+            //     //             getBlock(block->data->chunk, x, CHUNK_SIZE-1, z)->nb_pos_y = getBlock(block->nb_pos_y->data->chunk, x, 0, z);
+            //     // if (block->nb_neg_y && block->nb_neg_y->data)
+            //     //     for (x = 0; x < CHUNK_SIZE; x++)
+            //     //         for (z = 0; z < CHUNK_SIZE; z++)
+            //     //             getBlock(block->data->chunk, x, 0, z)->nb_neg_y = getBlock(block->nb_neg_y->data->chunk, x, CHUNK_SIZE-1, z);
+            //     // if (block->nb_pos_z && block->nb_pos_z->data)
+            //     //     for (x = 0; x < CHUNK_SIZE; x++)
+            //     //         for (y = 0; y < CHUNK_SIZE; y++)
+            //     //             getBlock(block->data->chunk, x, y, CHUNK_SIZE-1)->nb_pos_z = getBlock(block->nb_pos_z->data->chunk, x, y, 0);
+            //     // if (block->nb_neg_z && block->nb_neg_z->data)
+            //     //     for (x = 0; x < CHUNK_SIZE; x++)
+            //     //         for (y = 0; y < CHUNK_SIZE; y++)
+            //     //             getBlock(block->data->chunk, x, y, 0)->nb_neg_z = getBlock(block->nb_neg_z->data->chunk, x, y, CHUNK_SIZE-1);
+            //     updateChunkLogic(block->data->chunk, logicBlocks, count, max_count);
+            //     if (block->data->chunk->needsUpdate)
             //         chunk->needsUpdate = 1;
-            //     }
             // }
         }
     }
@@ -282,10 +359,11 @@ void logicLoop(World *world) {
     Block *block;
 
     unsigned int num_chunks = world->size * world->size * world->size;
-    unsigned int num_blocks = num_chunks * BLOCKS_PER_CHUNK;
+    // unsigned int num_blocks = num_chunks * BLOCKS_PER_CHUNK;
 
-    Block **logicBlocks = malloc(num_blocks * sizeof(Block*));
     int count;
+    int max_count = BLOCKS_PER_CHUNK;
+    Block **logicBlocks = malloc(max_count * sizeof(Block*));
 
     while (!quitThread) {
         // usleep(1000);
@@ -293,7 +371,7 @@ void logicLoop(World *world) {
         count = 0;
 
         for (i = 0; i < num_chunks; i++) {
-            updateChunkLogic(world->chunks[i], logicBlocks, &count);
+            updateChunkLogic(world->chunks[i], &logicBlocks, &count, &max_count);
         }
 
         // advance logic (send updated outputs)
