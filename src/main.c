@@ -87,23 +87,25 @@ static GLuint normalModelUniformID, normalViewUniformID,
 static mat4 viewMatrix;
 static mat4 projectionMatrix;
 
-static Player player;
+static Player *player;
+static World *world;
 
 static double currTime = 0.0;
 
 static double mousex, mousey;
 static int mouseButtons[2] = {0, 0};
-static int control, inertia, wireframe;
+
+static int control, inertia, wireframe, placeModel;
 static Selection selection;
-static int placeModel = 0;
-static int selectedType = 0, s_roll = 0, s_pitch = 0, s_yaw = 0;
-static float colorx = 0.5, colory = 0;
+
+static int s_roll, s_pitch, s_yaw;
+static int selectedType;
+
+static float colorx, colory;
 static Color currColor;
 
 // static Light *light[MAX_LIGHTS];
 // static int lightCount = 0;
-static World *world;
-static Mesh *playerModel;
 static Mesh *selectedFrame;
 static Mesh *crosshair;
 static Mesh *blockTypes[NUM_GATES+1];
@@ -142,9 +144,9 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
             break;
         case GLFW_KEY_1:
             if (action == GLFW_RELEASE) {
-                Chunk *chunk = getChunk(world, (int)(player.position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
-                                            (int)(player.position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
-                                            (int)(player.position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE);
+                Chunk *chunk = getChunk(world, (int)(player->position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                            (int)(player->position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                            (int)(player->position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE);
                 char* name = malloc(40);
                 sprintf(name, "models/model%ld", time(NULL));
                 writeModel(chunk, name);
@@ -162,14 +164,14 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
             break;
         case GLFW_KEY_3:
             if (action == GLFW_RELEASE) {
-                copyChunk(getChunk(world, (int)(player.position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
-                                          (int)(player.position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
-                                          (int)(player.position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE),
+                copyChunk(getChunk(world, (int)(player->position[0] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                          (int)(player->position[1] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE,
+                                          (int)(player->position[2] / BLOCK_WIDTH) >> LOG_CHUNK_SIZE),
                           model1->chunk);
             }
             break;
         case GLFW_KEY_E:
-            if (selection.selected_active) {
+            if (action == GLFW_PRESS && selection.selected_active) {
                 Block* selected = selectedBlock(world, &selection);
                 currColor = selected->color;
                 if (selected->logic) {
@@ -184,6 +186,7 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                 if (selected->data) {
                     model1 = selected->data;
                 }
+
                 updateColorRect();
             }
             break;
@@ -213,13 +216,26 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
                 if (selected->logic) {
                     selected->logic->type++;
                     selected->logic->type %= NUM_GATES;
+                    if (selected->logic->auto_orient)
+                        autoOrient(selected);
                 } else {
-                    selected->logic = calloc(1, sizeof(Logic));
-                    selected->logic->auto_orient = 1;
+                    initLogicBlock(selected, 1, 0, 0, 0, 0);
                 }
-                if (selected->logic->auto_orient)
-                    autoOrient(selected);
-                updateLogicModel(selected);
+                renderChunk(chunk);
+            }
+            break;
+        case GLFW_KEY_K:
+            if (action == GLFW_PRESS && selection.selected_active) {
+                Block* selected = selectedBlock(world, &selection);
+                Chunk *chunk = getChunk(world, selection.previous_chunk_x, selection.previous_chunk_y, selection.previous_chunk_z);
+                if (selected->logic) {
+                    selected->logic->type += (NUM_GATES-1);
+                    selected->logic->type %= NUM_GATES;
+                    if (selected->logic->auto_orient)
+                        autoOrient(selected);
+                } else {
+                    initLogicBlock(selected, 1, NUM_GATES-1, 0, 0, 0);
+                }
                 renderChunk(chunk);
             }
             break;
@@ -291,6 +307,7 @@ static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 
 static void initInputs(GLFWwindow* window) {
     control = 1;
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwGetCursorPos(window, &mousex, &mousey);
     glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, 1);
@@ -302,7 +319,6 @@ static void initInputs(GLFWwindow* window) {
 
 static void readInputs(GLFWwindow* window) {
     if (control) {
-
         // mouse buttons
 
         int newMouseButtons[2] = {
@@ -310,36 +326,30 @@ static void readInputs(GLFWwindow* window) {
             glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) ^ GLFW_RELEASE
         };
 
-        if (newMouseButtons[0] && !mouseButtons[0])
+        if (newMouseButtons[0] && !mouseButtons[0]) {
             if (selection.selected_active) {
-                setBlock(getChunk(world, selection.selected_chunk_x, selection.selected_chunk_y, selection.selected_chunk_z),
-                         selection.selected_block_x, selection.selected_block_y, selection.selected_block_z, (Block){0, {.all=0}, NULL, NULL});
+                setBlock(
+                    selectedChunk(world, &selection),
+                    selection.selected_block_x,
+                    selection.selected_block_y,
+                    selection.selected_block_z,
+                    (Block){0, {.all=0}, NULL, NULL}
+                 );
             }
+        }
 
         if (newMouseButtons[1] && !mouseButtons[1])
             if (selection.previous_active) {
-                Chunk *chunk = getChunk(world, selection.previous_chunk_x, selection.previous_chunk_y, selection.previous_chunk_z);
+                Block block = (Block){1, currColor, NULL, NULL};
 
                 if (selectedType) {
-                    Block block = (Block){1, currColor, NULL, NULL};
-                    block.logic = calloc(1, sizeof(Logic));
-                    block.logic->type = selectedType - 1;
-                    block.logic->roll = s_roll;
-                    block.logic->pitch = s_pitch;
-                    block.logic->yaw = s_yaw;
-                    updateLogicModel(&block);
-                    setBlock(chunk, selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, block);
-                    if (!s_roll && !s_pitch && !s_yaw)
-                        autoOrient(getBlock(chunk, selection.previous_block_x, selection.previous_block_y, selection.previous_block_z));
-                } else {
-                    if (placeModel) {
-                        Block block;
-                        insertModel(model1, &block);
-                        setBlock(chunk, selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, block);
-                    } else {
-                        setBlock(chunk, selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, (Block){1, currColor, NULL, NULL});
-                    }
+                    initLogicBlock(&block, !(s_roll | s_pitch | s_yaw), selectedType - 1, s_roll, s_pitch, s_yaw);
+                } else if (placeModel) {
+                    insertModel(model1, &block);
                 }
+
+                setBlock(getChunk(world, selection.previous_chunk_x, selection.previous_chunk_y, selection.previous_chunk_z),
+                         selection.previous_block_x, selection.previous_block_y, selection.previous_block_z, block);
             }
 
         // mouse position
@@ -350,22 +360,22 @@ static void readInputs(GLFWwindow* window) {
         mouseButtons[0] = newMouseButtons[0];
         mouseButtons[1] = newMouseButtons[1];
 
-        player.horizontalAngle += MOUSE_SPEED * deltaTime * (mousex - xpos);
-        player.verticalAngle += MOUSE_SPEED * deltaTime * (mousey - ypos);
+        player->horizontalAngle += MOUSE_SPEED * deltaTime * (mousex - xpos);
+        player->verticalAngle += MOUSE_SPEED * deltaTime * (mousey - ypos);
 
-        if (player.verticalAngle > PI/2)
-            player.verticalAngle = PI/2;
-        if (player.verticalAngle < -PI/2)
-            player.verticalAngle = -PI/2;
+        if (player->verticalAngle > PI/2)
+            player->verticalAngle = PI/2;
+        if (player->verticalAngle < -PI/2)
+            player->verticalAngle = -PI/2;
 
         mousex = xpos;
         mousey = ypos;
 
-        player.direction[0] = cos(player.horizontalAngle + PI/2) * cos(player.verticalAngle);
-        player.direction[1] = sin(player.verticalAngle);
-        player.direction[2] = sin(player.horizontalAngle + PI/2) * cos(player.verticalAngle);
+        player->direction[0] = cos(player->horizontalAngle + PI/2) * cos(player->verticalAngle);
+        player->direction[1] = sin(player->verticalAngle);
+        player->direction[2] = sin(player->horizontalAngle + PI/2) * cos(player->verticalAngle);
 
-        movePlayer(&player, world,
+        movePlayer(player, world,
                    glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS,
                    glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS,
                    glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS,
@@ -375,9 +385,9 @@ static void readInputs(GLFWwindow* window) {
                    inertia);
 
         identity_m4(viewMatrix);
-        translate_m4(viewMatrix, VALUES(-player.position));
-        rotate_Y_m4(viewMatrix, player.horizontalAngle);
-        rotate_X_m4(viewMatrix, player.verticalAngle);
+        translate_m4(viewMatrix, VALUES(-player->position));
+        rotate_Y_m4(viewMatrix, player->horizontalAngle);
+        rotate_X_m4(viewMatrix, player->verticalAngle);
     } else {
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
             control = 1;
@@ -388,7 +398,6 @@ static void readInputs(GLFWwindow* window) {
 }
 
 static void initMeshes() {
-    makeBox(playerModel, VALUES(player.bounding_box.min), VALUES(player.bounding_box.size), (vec3){0.4, 0.6, 0.9});
     buildBlockFrame(selectedFrame);
     makeCrosshair(crosshair, 2, 20, 2);
     makeColorChooser(colorChooser, ccparams[0], ccparams[1], ccparams[2], ccparams[3]);
@@ -594,6 +603,19 @@ void drawMesh(Mesh * mesh) {
 }
 
 void init(GLFWwindow *window) {
+    control = 1;
+    wireframe = 0;
+    inertia = 1;
+    placeModel = 0;
+
+    selectedType = 0;
+    s_roll = s_pitch = s_yaw = 0;
+
+    colorx = 0.5;
+    colory = 0.0;
+
+    selection.selected_active = selection.previous_active = 0;
+
     initInputs(window);
 
     glfwGetFramebufferSize(window, &frame_buffer_width, &frame_buffer_height);
@@ -638,18 +660,12 @@ void init(GLFWwindow *window) {
     world = readWorld("worlds/saved");
     // world = readWorld("worlds/gates_updated");
 
-    float world_width = world->size * CHUNK_WIDTH;
-
-    player = (Player){{world_width/2, world_width, world_width/2}, {0, 0, -1}, {0, 0, 0},
-                      0.0, 0.0,
-                      {{-.4f*BLOCK_WIDTH, -2.5f*BLOCK_WIDTH, -.4f*BLOCK_WIDTH},
-                      {.8f*BLOCK_WIDTH, 2.8f*BLOCK_WIDTH, .8f*BLOCK_WIDTH}}};
+    player = createPlayer(world);
 
     // makeLight((vec3){0, 0, 0}, (vec3){1, 1, 1}, BLOCK_WIDTH, CHUNK_WIDTH*2);
     // glActiveTexture(GL_TEXTURE0);
     // glBindTexture(GL_TEXTURE_CUBE_MAP, light[0]->shadowMapTex);
 
-    playerModel    = createMesh();
     selectedFrame  = createMesh();
     crosshair      = createMesh();
     colorChooser   = createMesh();
@@ -663,14 +679,6 @@ void init(GLFWwindow *window) {
 
     model1 = createModel();
     readModel(model1, "models/model1");
-
-    /* control / option variables */
-
-    control = 1;
-    wireframe = 0;
-    inertia = 1;
-
-    selection.selected_active = selection.previous_active = 0;
 
     /* get shader uniforms */
 
@@ -752,9 +760,9 @@ void tick(GLFWwindow *window) {
     currTime = newTime;
 
     // moveLight(light[0], (vec3) {
-    //     player.position[0] + (cos(currTime)*2)*BLOCK_WIDTH*5,
-    //     player.position[1],// + BLOCK_WIDTH*2,
-    //     player.position[2] + (sin(currTime)*2)*BLOCK_WIDTH*5
+    //     player->position[0] + (cos(currTime)*2)*BLOCK_WIDTH*5,
+    //     player->position[1],// + BLOCK_WIDTH*2,
+    //     player->position[2] + (sin(currTime)*2)*BLOCK_WIDTH*5
     // });
 
     /*moveLight(light, (vec3) {
@@ -766,14 +774,10 @@ void tick(GLFWwindow *window) {
     readInputs(window);
 
     vec3 pos;
-    copy_v3(pos, player.position);
+    copy_v3(pos, player->position);
     scale_v3(pos, 1.0f/BLOCK_WIDTH);
 
-    selection = selectBlock(world, pos, player.direction, CHUNK_SIZE);
-
-    identity_m4(playerModel->modelMatrix);
-    rotate_Y_m4(playerModel->modelMatrix, -player.horizontalAngle);
-    translate_m4(playerModel->modelMatrix, VALUES(player.position));
+    selection = selectBlock(world, pos, player->direction, CHUNK_SIZE);
 
     for (int i = 0; i < world->num_chunks; i++) {
         if (world->chunks[i]->needsUpdate) {
@@ -858,9 +862,6 @@ static void renderWorld(mat4 view, mat4 projection) {
     // for (i = 0; i < lightCount; i++)
     //     drawMesh(light[i]->mesh);
 
-    // draw the player
-    drawMesh(playerModel);
-
     // draw the world chunks
     drawWorld(world, view, projection);
 }
@@ -935,15 +936,27 @@ void finish() {
     // for (i = 0; i < lightCount; i++)
     //     freeLight(light[i]);
     freeWorld(world);
+    freePlayer(player);
 
-    // freeMesh(selectedFrame);
-    free(selectedFrame);
+    freeMesh(selectedFrame);
+    // free(selectedFrame);
 
     freeMesh(crosshair);
     free(crosshair);
 
     freeMesh(colorChooser);
     free(colorChooser);
+
+    freeMesh(colorCrosshair);
+    free(colorCrosshair);
+
+    freeMesh(colorRect);
+    free(colorRect);
+
+    for (int i=0; i < NUM_GATES+1; i++) {
+        freeMesh(blockTypes[i]);
+        free(blockTypes[i]);
+    }
 
     // freeModel(model1);
 

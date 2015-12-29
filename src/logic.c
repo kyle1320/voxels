@@ -74,6 +74,33 @@ static mat4 rotation_matrices[4][4][4];
 static pthread_t thread;
 static int quitThread = 0;
 
+Logic *createLogic() {
+    Logic *logic = calloc(1, sizeof(Logic));
+
+    logic->auto_orient = 1;
+
+    return logic;
+}
+
+void freeLogic(Logic *logic) {
+    free(logic);
+}
+
+void initLogicBlock(Block *block, int orient, int type, int roll, int pitch, int yaw) {
+    if (block->logic)
+        freeLogic(block->logic);
+
+    block->logic = createLogic();
+    block->logic->type = type;
+    block->logic->roll = roll;
+    block->logic->pitch = pitch;
+    block->logic->yaw = yaw;
+
+    if (orient) autoOrient(block);
+
+    updateLogicModel(block);
+}
+
 void initLogicModels() {
     char *fname = malloc(40);
     Model *model;
@@ -284,10 +311,8 @@ void updateLogicModel(Block *block) {
     }
 }
 
-#define BLOCKS_PER_CHUNK CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE
-
 static void updateChunkLogic(Chunk *chunk, Block ***logicBlocks, int *count, int *max_count) {
-    int i, j, k, type, input, output;
+    int i, type, input, output;
     Block *block;
 
     // don't bother looping if there aren't any blocks.
@@ -390,14 +415,12 @@ void logicLoop(World *world) {
     }
 
     free(logicBlocks);
-
-    #undef BLOCKS_PER_CHUNK
 }
 
 void runLogicThread(World *world) {
     quitThread = 0;
 
-    pthread_create(&thread, NULL, logicLoop, world);
+    pthread_create(&thread, NULL, (void *(*)(void *))logicLoop, world);
 }
 
 void stopLogicThread() {

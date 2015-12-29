@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -std=c99 -O3 -I '/usr/local/include/'
+CFLAGS = -ggdb -Wall -std=c99 -O -I '/usr/local/include/'
 LIBFLAGS = -L/usr/local/lib -lglfw3 -lglew -framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo -lpthread
 
 main: main.o voxels.o loadShaders.o matrix.o loadTexture.o mesh.o physics.o model.o color.o light.o logic.o
@@ -18,4 +18,4 @@ physics.o:     physics.c physics.h matrix.h
 model.o:       model.c model.h voxels.h color.h
 color.o:       color.c color.h
 light.o:       light.c light.h mesh.h
-logic.o:       logic.c logic.h
+logic.o:       logic.c logic.h voxels.h

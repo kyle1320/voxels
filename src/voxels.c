@@ -601,7 +601,7 @@ char readChunk(Chunk *chunk, FILE *in) {
         count += buf.count;
         data = buf.data;
 
-        while (buf.count > 0) {
+        while (buf.count > 0 && i < CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) {
             block = &chunk->blocks_lin[i];
 
             if (data.logic) {
@@ -714,14 +714,21 @@ void fillWorld(World *world) {
                 for (bx = 0; bx < CHUNK_SIZE; bx++) {
                     for (by = 0; by < CHUNK_SIZE; by++) {
                         for (bz = 0; bz < CHUNK_SIZE; bz++) {
+                            int r = (!bx|(bx==CHUNK_SIZE-1))&(!bz|(bz==CHUNK_SIZE-1));
                             int m = (bx + by + bz) % 2 ? -1 : (-1 << 6);
+                            if (r) {
+                                m = 0;
+                                r = 255;
+                            }
+
                             if (by == 0 && cy == 0) {
                                 setBlock(getChunk(world, cx, cy, cz), bx, by, bz,
-                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
-                            } else if (((bx == 0 && cx == 0) || (bz == 0 && cz == 0)) && by == 1 && cy == 0) {
-                                setBlock(getChunk(world, cx, cy, cz), bx, by, bz,
-                                    (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
+                                    (Block){1, {{255 & (r|m), 255 & m, 255 & m, 255}}});
                             }
+                            // } else if (((bx == 0 && cx == 0) || (bz == 0 && cz == 0)) && by == 1 && cy == 0) {
+                            //     setBlock(getChunk(world, cx, cy, cz), bx, by, bz,
+                            //         (Block){1, {{255 & m, 255 & m, 255 & m, 255}}});
+                            // }
                         }
                     }
                 }
@@ -759,6 +766,9 @@ void freeWorld(World *world) {
 void setBlock(Chunk *chunk, int x, int y, int z, Block block) {
     Block *current = getBlock(chunk, x, y, z);
 
+    if (current->logic)
+        freeLogic(current->logic);
+
     block.nb_pos_x = current->nb_pos_x;
     block.nb_neg_x = current->nb_neg_x;
     block.nb_pos_y = current->nb_pos_y;
@@ -771,10 +781,10 @@ void setBlock(Chunk *chunk, int x, int y, int z, Block block) {
 }
 
 void buildBlockFrame(Mesh *mesh) {
-    const GLfloat C0_0 = - 1*BLOCK_WIDTH/32;
-    const GLfloat C0_1 =   1*BLOCK_WIDTH/32;
-    const GLfloat C1_0 =  31*BLOCK_WIDTH/32;
-    const GLfloat C1_1 =  33*BLOCK_WIDTH/32;
+    const GLfloat C0_0 = - 1*BLOCK_WIDTH/64;
+    const GLfloat C0_1 =   1*BLOCK_WIDTH/64;
+    const GLfloat C1_0 =  63*BLOCK_WIDTH/64;
+    const GLfloat C1_1 =  65*BLOCK_WIDTH/64;
 
     GLfloat points[] = {
         C0_0, C0_0, C0_0, C0_0, C0_0, C0_1, C0_0, C0_1, C0_0, C0_0, C0_1, C0_1,
@@ -1044,11 +1054,6 @@ Selection selectBlock(World *world, vec3 position, vec3 direction, float radius)
     }
 
     return ret;
-}
-
-Block* selectedBlock(World *world, Selection* selection) {
-    return getBlock(getChunk(world, selection->selected_chunk_x, selection->selected_chunk_y, selection->selected_chunk_z),
-                    selection->selected_block_x, selection->selected_block_y, selection->selected_block_z);
 }
 
 Block* worldBlock(World *world, int x, int y, int z) {

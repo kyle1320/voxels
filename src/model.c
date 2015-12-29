@@ -5,11 +5,6 @@
 #include "model.h"
 #include "mesh.h"
 
-typedef struct RLE_S {
-    unsigned int count;
-    Color color;
-} RLE;
-
 extern int useMeshing;
 
 Model *createModel() {
@@ -36,8 +31,6 @@ Model *createModel() {
 }
 
 void readModel(Model *model, char *file_path) {
-    #define COUNT CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE
-
     FILE *in = fopen(file_path, "rb");
 
     if (!in) {
@@ -46,12 +39,9 @@ void readModel(Model *model, char *file_path) {
     }
 
     readChunk(model->chunk, in);
-
     renderModel(model);
 
     fclose(in);
-
-    #undef COUNT
 }
 
 void writeModel(Chunk *chunk, char *file_path) {

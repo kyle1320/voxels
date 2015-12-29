@@ -13,10 +13,10 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
     GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
     // Read the Vertex Shader code from the file
-    char * vertexShaderCode = readFile(vertex_file_path);
+    const GLchar *vertexShaderCode = readFile(vertex_file_path);
 
     // Read the Fragment Shader code from the file
-    char * fragmentShaderCode = readFile(fragment_file_path);
+    const GLchar *fragmentShaderCode = readFile(fragment_file_path);
 
     GLint result = GL_FALSE;
     int infoLogLength;
@@ -25,7 +25,7 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
     //printf("Compiling shader : %s\n", vertex_file_path);
     glShaderSource(vertexShaderID, 1, &vertexShaderCode , NULL);
     glCompileShader(vertexShaderID);
-    free(vertexShaderCode);
+    free((void*)vertexShaderCode);
 
     // Check Vertex Shader
     glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &result);
@@ -40,7 +40,7 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
     //printf("Compiling shader : %s\n", fragment_file_path);
     glShaderSource(fragmentShaderID, 1, &fragmentShaderCode , NULL);
     glCompileShader(fragmentShaderID);
-    free(fragmentShaderCode);
+    free((void*)fragmentShaderCode);
 
     // Check Fragment Shader
     glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &result);

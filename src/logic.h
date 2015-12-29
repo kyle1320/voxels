@@ -7,7 +7,7 @@
 #define NUM_GATES 14
 
 typedef struct Logic_S {
-    unsigned int type:4;
+    unsigned int type:6;
     unsigned int yaw:2;
     unsigned int pitch:2;
     unsigned int roll:2;
@@ -26,11 +26,17 @@ typedef struct Logic_S {
     mat4 *rotationMatrix;
 } Logic;
 
-void initLogicModels();
+Logic *createLogic();
+void freeLogic(Logic *logic);
+void initLogicBlock(Block *block, int orient, int type, int roll, int pitch, int yaw);
+
 Model *getLogicModel(int type, int inputs);
-void freeLogicModels();
 void updateLogicModel(Block *block);
 void autoOrient(Block *block);
+
+void initLogicModels();
+void freeLogicModels();
+
 void runLogicThread(World *world);
 void stopLogicThread();
 

@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "physics.h"
+#include "voxels.h"
 
 #define HORIZONTAL_MOVE_SPEED 0.3
 #define VERTICAL_MOVE_SPEED 0.1
@@ -9,22 +11,40 @@
 
 extern double deltaTime;
 
-vec3 gravity = {0, -3 * CHUNK_WIDTH, 0};
+vec3 gravity = {0, -48 * BLOCK_WIDTH, 0};
 vec3 movementDecay = {0.7, 1, 0.7};
 
-void movePlayer(Player *player, World *world, int fwd_b, int bwd_b, int left_b, int right_b, int up_b, int down_b, int inertia) {
-    vec3 fwd = {
-        cos(player->horizontalAngle + PI/2) * HORIZONTAL_MOVE_SPEED,
-        0,
-        sin(player->horizontalAngle + PI/2) * HORIZONTAL_MOVE_SPEED
+Player *createPlayer(World *world) {
+    Player *player = calloc(1, sizeof(Player));
+
+    float world_width = world->size * CHUNK_WIDTH;
+
+    *player = (Player) {
+        {world_width/2, world_width, world_width/2},
+        {0, 0, -1},
+        {0, 0, 0},
+        0.0, 0.0,
+        {
+            {-.4f*BLOCK_WIDTH, -2.5f*BLOCK_WIDTH, -.4f*BLOCK_WIDTH},
+            {.8f*BLOCK_WIDTH, 2.8f*BLOCK_WIDTH, .8f*BLOCK_WIDTH}
+        }
     };
 
+    return player;
+}
+
+void freePlayer(Player *player) {
+    free(player);
+}
+
+void movePlayer(Player *player, World *world, int fwd_b, int bwd_b, int left_b, int right_b, int up_b, int down_b, int inertia) {
     vec3 right = {
         cos(player->horizontalAngle) * HORIZONTAL_MOVE_SPEED,
         0,
         sin(player->horizontalAngle) * HORIZONTAL_MOVE_SPEED
     };
 
+    vec3 fwd = {-right[2], 0, right[0]};
     vec3 up = {0, VERTICAL_MOVE_SPEED, 0};
 
     vec3 movement = {0, 0, 0};
@@ -94,11 +114,11 @@ void collidePlayer(Player *player, World *world) {
 
                 for(min[i] = minv, max[i] = minv; min[i] <= maxv; min[i]++, max[i]++) {
                     if (solidBlockInArea(world, min[0], min[1], min[2], max[0]+1, max[1]+1, max[2]+1)) {
-                        if (player->velocity[i] > 0) {
+                        // if (player->velocity[i] > 0) {
                             player->position[i] = (min[i]*BLOCK_WIDTH) - (player->bounding_box.min[i] + player->bounding_box.size[i]) - EPSILON;
-                        } else {
-                            player->position[i] = ((max[i]+1)*BLOCK_WIDTH) - player->bounding_box.min[i] + EPSILON;
-                        }
+                        // } else {
+                            // player->position[i] = ((max[i]+1)*BLOCK_WIDTH) - player->bounding_box.min[i] + EPSILON;
+                        // }
                         player->velocity[i] = 0;
                         break;
                     }
@@ -109,11 +129,11 @@ void collidePlayer(Player *player, World *world) {
 
                 for(min[i] = minv, max[i] = minv; min[i] >= maxv; min[i]--, max[i]--) {
                     if (solidBlockInArea(world, min[0], min[1], min[2], max[0]+1, max[1]+1, max[2]+1)) {
-                        if (player->velocity[i] > 0) {
-                            player->position[i] = (min[i]*BLOCK_WIDTH) - (player->bounding_box.min[i] + player->bounding_box.size[i]) - EPSILON;
-                        } else {
+                        // if (player->velocity[i] > 0) {
+                            // player->position[i] = (min[i]*BLOCK_WIDTH) - (player->bounding_box.min[i] + player->bounding_box.size[i]) - EPSILON;
+                        // } else {
                             player->position[i] = ((max[i]+1)*BLOCK_WIDTH) - player->bounding_box.min[i] + EPSILON;
-                        }
+                        // }
                         player->velocity[i] = 0;
                         break;
                     }

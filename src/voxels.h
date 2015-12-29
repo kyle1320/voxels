@@ -10,9 +10,13 @@
 #define LOG_CHUNK_SIZE 4
 #define CHUNK_SIZE (1 << LOG_CHUNK_SIZE)
 #define CHUNK_WIDTH (CHUNK_SIZE * BLOCK_WIDTH)
+#define BLOCKS_PER_CHUNK (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
 
 #define getBlock(chunk, x, y, z) (&chunk->blocks[x][y][z])
 #define getChunk(world, x, y, z) (world->chunks[(((x) * world->size) + (y)) * world->size + (z)])
+
+#define selectedChunk(world, sel) (getChunk(world, (sel)->selected_chunk_x, (sel)->selected_chunk_y, (sel)->selected_chunk_z))
+#define selectedBlock(world, sel) (getBlock(selectedChunk(world, sel), (sel)->selected_block_x, (sel)->selected_block_y, (sel)->selected_block_z))
 
 #define BIN_3(_0, _1) _0, _0, _0, _0, _0, _1, _0, _1, _0, _0, _1, _1, _1, _0, _0, _1, _0, _1, _1, _1, _0, _1, _1, _1
 
@@ -94,7 +98,6 @@ void writeChunk(Chunk *chunk, FILE *out);
 // blocks
 
 Selection selectBlock(World *world, vec3 position, vec3 direction, float radius);
-Block* selectedBlock(World *world, Selection* selection);
 
 Block* worldBlock(World *world, int x, int y, int z);
 
