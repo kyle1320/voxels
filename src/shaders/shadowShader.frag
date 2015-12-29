@@ -7,5 +7,5 @@ uniform float lightRadius;
 
 void main()
 {
-	gl_FragDepth = length(lightSource - worldPos) / lightRadius;
+    gl_FragDepth = length(lightSource - worldPos) / lightRadius;
 }

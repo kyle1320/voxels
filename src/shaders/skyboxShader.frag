@@ -8,5 +8,5 @@ out vec4 color;
 
 void main()
 {
-	color = texture(skybox, fragmentPos);
+    color = texture(skybox, fragmentPos);
 }

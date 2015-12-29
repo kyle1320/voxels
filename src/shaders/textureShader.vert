@@ -14,7 +14,7 @@ out vec3 fragmentUV;
 
 void main(void)
 {
-	gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(vertexPosition, 1);
-	fragmentColor = vertexColor;
-	fragmentUV = vertexUV;
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(vertexPosition, 1);
+    fragmentColor = vertexColor;
+    fragmentUV = vertexUV;
 }

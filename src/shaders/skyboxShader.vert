@@ -10,7 +10,7 @@ out vec3 fragmentPos;
 
 void main(void)
 {
-	vec4 pos = projectionMatrix * viewMatrix * modelMatrix * vec4(vertexPosition, 1);
-	gl_Position = pos.xyww;
-	fragmentPos = vertexPosition;
+    vec4 pos = projectionMatrix * viewMatrix * modelMatrix * vec4(vertexPosition, 1);
+    gl_Position = pos.xyww;
+    fragmentPos = vertexPosition;
 }

@@ -9,5 +9,5 @@ out vec3 color;
 
 void main()
 {
-	color = fragmentColor * texture(currTexture, fragmentUV).xyz;
+    color = fragmentColor * texture(currTexture, fragmentUV).xyz;
 }
